@@ -5,6 +5,7 @@
 #include "UE5TopDownARPGCharacter.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UE5TopDownARPG.h"
+#include "NavigationSystem.h"
 
 AUE5TopDownARPGGameMode::AUE5TopDownARPGGameMode()
 {

@@ -11,6 +11,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "UE5TopDownARPG.h"
+#include "NavigationSystem.h"
 
 AUE5TopDownARPGPlayerController::AUE5TopDownARPGPlayerController()
 {
@@ -39,6 +40,45 @@ void AUE5TopDownARPGPlayerController::BeginPlay()
 	{
 		Subsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
+
+	UWorld* World = GetWorld();
+	if (IsValid(World) == false)
+	{
+		return;
+	}
+
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World);
+
+	if (IsValid(NavSys) == false)
+	{
+		return;
+	}
+	ANavigationData* NavData = NavSys->GetDefaultNavDataInstance();
+
+	if (IsValid(NavData) == false)
+	{
+		return;
+	}
+
+	FVector HitLocation;
+	FVector RayStart;
+	FVector RayEnd;
+	FHitResult OutHit;
+
+	for (int i = 0; i <= 30; i++)
+	{
+		for (int j = 0; j <= 30; j++)
+		{
+			RayStart = FVector(i * 100 + 50, j * 100 + 50, 300);
+			RayEnd = FVector(i * 100 + 50, j * 100 + 50, 100);
+			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
+			bool bLineTraceObstructed = World->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
+			
+			UE_LOG(LogUE5TopDownARPG, Log, TEXT("Raycast at %s, %s: %d"), *(RayStart.ToString()), *(RayEnd.ToString()), (int)bLineTraceObstructed);
+			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, bLineTraceObstructed ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
+		}
+	}
+
 }
 
 void AUE5TopDownARPGPlayerController::SetupInputComponent()

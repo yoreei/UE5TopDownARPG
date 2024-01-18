@@ -10,6 +10,9 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "UE5TopDownARPG.h"
+#include "Kismet/GameplayStatics.h"
+#include "CrowdNav/CrowdNavComponent.h"
+#include "AI/UE5TopDownARPGAIController.h"
 
 AUE5TopDownARPGPlayerController::AUE5TopDownARPGPlayerController()
 {
@@ -17,6 +20,8 @@ AUE5TopDownARPGPlayerController::AUE5TopDownARPGPlayerController()
 	DefaultMouseCursor = EMouseCursor::Default;
 	CachedDestination = FVector::ZeroVector;
 	FollowTime = 0.f;
+
+	CrowdNavComponent = CreateDefaultSubobject<UCrowdNavComponent>(TEXT("CrowdNavComponent"));
 }
 
 void AUE5TopDownARPGPlayerController::BeginPlay()
@@ -36,28 +41,27 @@ void AUE5TopDownARPGPlayerController::SetupInputComponent()
 	// set up gameplay key bindings
 	Super::SetupInputComponent();
 
-	// Set up action bindings
+	//Setupactionbindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent))
 	{
-		// Setup mouse input events
+		//Setupmouseinputevents
 		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &AUE5TopDownARPGPlayerController::OnInputStarted);
 		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &AUE5TopDownARPGPlayerController::OnSetDestinationTriggered);
 		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &AUE5TopDownARPGPlayerController::OnSetDestinationReleased);
 		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &AUE5TopDownARPGPlayerController::OnSetDestinationReleased);
-
 		EnhancedInputComponent->BindAction(ActivateAbilityAction, ETriggerEvent::Started, this, &AUE5TopDownARPGPlayerController::OnActivateAbilityStarted);
-
-		// Setup touch input events
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &AUE5TopDownARPGPlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &AUE5TopDownARPGPlayerController::OnTouchTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &AUE5TopDownARPGPlayerController::OnTouchReleased);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &AUE5TopDownARPGPlayerController::OnTouchReleased);
 	}
+	//	// Setup touch input events
+	//	EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &AUE5TopDownARPGPlayerController::OnInputStarted);
+	//	EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &AUE5TopDownARPGPlayerController::OnTouchTriggered);
+	//	EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &AUE5TopDownARPGPlayerController::OnTouchReleased);
+	//	EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &AUE5TopDownARPGPlayerController::OnTouchReleased);
+	//}
 }
 
 void AUE5TopDownARPGPlayerController::OnInputStarted()
 {
-	StopMovement();
+	// StopMovement();
 }
 
 // Triggered every frame when the input is held down
@@ -83,14 +87,6 @@ void AUE5TopDownARPGPlayerController::OnSetDestinationTriggered()
 	{
 		CachedDestination = Hit.Location;
 	}
-	
-	// Move towards mouse pointer or touch
-	APawn* ControlledPawn = GetPawn();
-	if (ControlledPawn != nullptr)
-	{
-		FVector WorldDirection = (CachedDestination - ControlledPawn->GetActorLocation()).GetSafeNormal();
-		ControlledPawn->AddMovementInput(WorldDirection, 1.0, false);
-	}
 }
 
 void AUE5TopDownARPGPlayerController::OnSetDestinationReleased()
@@ -98,9 +94,24 @@ void AUE5TopDownARPGPlayerController::OnSetDestinationReleased()
 	// If it was a short press
 	if (FollowTime <= ShortPressThreshold)
 	{
-		// We move there and spawn some particles
-		UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, CachedDestination);
+		TArray<AActor*> FoundActors;
+		TArray<AAIController*> AIControllers;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUE5TopDownARPGAIController::StaticClass(), FoundActors); //TODO FIND A BETTER WAY!
+
+		for (AActor* Actor : FoundActors)
+		{
+			AAIController* AIController = Cast<AAIController>(Actor);
+			if (IsValid(AIController) == false)
+			{
+				continue;
+			}
+
+			AIControllers.Add(AIController);
+		}
+		CrowdNavComponent->MoveTo(AIControllers, CachedDestination);
+
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FXCursor, CachedDestination, FRotator::ZeroRotator, FVector(1.f, 1.f, 1.f), true, true, ENCPoolMethod::None, true);
+		// UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, CachedDestination);
 	}
 
 	FollowTime = 0.f;

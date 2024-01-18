@@ -6,11 +6,19 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
+#include "../UE5TopDownARPG.h"
+#include "Kismet/GameplayStatics.h"
 
 AUE5TopDownARPGAIController::AUE5TopDownARPGAIController()
 {
   BlackboardComponent = CreateDefaultSubobject<UBlackboardComponent>(TEXT("BlackboardComponent"));
   BehaviorTreeComponent = CreateDefaultSubobject<UBehaviorTreeComponent>(TEXT("BehaviorTreeComponent"));
+
+}
+
+void AUE5TopDownARPGAIController::SetMoveLocation()
+{
+    UE_LOG(LogUE5TopDownARPG, Log, TEXT("SetMoveLocation clicked!!!!")); //TODO DELETE
 }
 
 void AUE5TopDownARPGAIController::OnPossess(APawn* InPawn)
@@ -23,8 +31,8 @@ void AUE5TopDownARPGAIController::OnPossess(APawn* InPawn)
     UBehaviorTree* Tree = PossesedCharacter->GetBehaviorTree();
     if (IsValid(Tree))
     {
-      BlackboardComponent->InitializeBlackboard(*Tree->GetBlackboardAsset());
-      BehaviorTreeComponent->StartTree(*Tree);
+        BlackboardComponent->InitializeBlackboard(*Tree->GetBlackboardAsset());
+        BehaviorTreeComponent->StartTree(*Tree);
     }
   }
 }
@@ -34,4 +42,8 @@ void AUE5TopDownARPGAIController::OnUnPossess()
   Super::OnUnPossess();
 
   BehaviorTreeComponent->StopTree();
+}
+
+void AUE5TopDownARPGAIController::BeginPlay()
+{
 }

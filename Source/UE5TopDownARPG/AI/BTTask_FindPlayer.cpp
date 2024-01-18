@@ -47,6 +47,7 @@ EBTNodeResult::Type UBTTask_FindPlayer::ExecuteTask(UBehaviorTreeComponent& Owne
     }
 
     UNavigationPath* Path = NavSys->FindPathToLocationSynchronously(GetWorld(), PossesedPawn->GetActorLocation(), Actor->GetActorLocation());
+    //Path->EnableDebugDrawing(true, FLinearColor::Red); // HOW TO USE?
     if (Path->IsValid() && Path->IsPartial() == false)
     {
       UBlackboardComponent* BlackboardComponent = OwnerComp.GetBlackboardComponent();

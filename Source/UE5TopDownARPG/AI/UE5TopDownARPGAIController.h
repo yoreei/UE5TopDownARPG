@@ -6,6 +6,7 @@
 #include "AIController.h"
 #include "UE5TopDownARPGAIController.generated.h"
 
+
 /**
  * 
  */
@@ -17,14 +18,19 @@ class UE5TOPDOWNARPG_API AUE5TopDownARPGAIController : public AAIController
 public:
 	AUE5TopDownARPGAIController();
 
+
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
+	virtual void BeginPlay() override;
 
 	UPROPERTY()
 	class UBlackboardComponent* BlackboardComponent;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	class UBehaviorTreeComponent* BehaviorTreeComponent;
 
+	UFUNCTION()
+	void SetMoveLocation();
 };

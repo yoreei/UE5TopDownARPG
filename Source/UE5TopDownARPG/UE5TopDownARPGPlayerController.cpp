@@ -17,6 +17,8 @@
 #include <climits>
 
 const int CELL_SIZE = 100;
+const int COST_TRACE_Y_START = 300;
+const int COST_TRACE_Y_END = 100;
 
 struct IntegrationField {
 	int MapWidth;
@@ -52,10 +54,10 @@ void DebugDraw(UWorld* World, const FIntVector2& gridSize, const TArray<uint8_t>
 	{
 		for (int j = 0; j < gridSize.X; ++j)
 		{
-			RayStart = { i * 100.f + 50, j * 100.f + 50, 300.f };
-			RayEnd = { i * 100.f + 50, j * 100.f + 50, -300.f };
+			RayStart = { i * 100.f + 50, j * 100.f + 50, COST_TRACE_Y_START };
+			RayEnd = { i * 100.f + 50, j * 100.f + 50, COST_TRACE_Y_END };
 			UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * gridSize.X + j]);
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * gridSize.X + j] == 255 ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
+			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * gridSize.X + j] == UINT8_MAX ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
 		}
 	}
 }
@@ -193,7 +195,7 @@ void CalculateFlowFields(const FIntVector2& gridSize, const FIntVector2& EndPos,
 
 bool CalculateCostFields(UWorld* World, const FIntVector2& gridSize, OUT TArray<uint8_t>& CostFields)
 {
-	if (IsValid(World))
+	if (IsValid(World) == false)
 	{
 		return false;
 	}
@@ -206,12 +208,12 @@ bool CalculateCostFields(UWorld* World, const FIntVector2& gridSize, OUT TArray<
 	{
 		for (int j = 0; j < gridSize.X; ++j)
 		{
-			RayStart = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, 300.f);
-			RayEnd = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, -300.f);
+			RayStart = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, COST_TRACE_Y_START);
+			RayEnd = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, COST_TRACE_Y_END);
 			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
 			bool bLineTraceObstructed = World->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
 
-			CostFields[i * gridSize.X + j] = bLineTraceObstructed ? 1 : 255;
+			CostFields[i * gridSize.X + j] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}
 	}
 	return true;

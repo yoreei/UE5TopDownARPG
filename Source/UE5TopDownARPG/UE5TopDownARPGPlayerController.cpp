@@ -13,6 +13,10 @@
 #include "UE5TopDownARPG.h"
 #include "NavigationSystem.h"
 #include <map>
+#include <queue>
+#include <climits>
+
+const int CELL_SIZE = 100;
 
 struct IntegrationField {
 	int MapWidth;
@@ -21,8 +25,6 @@ struct IntegrationField {
 	float IntegratedCost;
 	uint8_t ActiveWaveFront : 4;
 	uint8_t LOS : 4;
-
-
 };
 
 enum class EDirection : uint8_t {
@@ -42,37 +44,39 @@ struct FlowField {
 	uint8_t LOS : 2;
 };
 
-void DebugDraw(UWorld* World, int MapWidth, int MapHeight, const TArray<uint8_t>& CostFields)
+void DebugDraw(UWorld* World, const FIntVector2& gridSize, const TArray<uint8_t>& CostFields)
 {
 	FVector RayStart;
 	FVector RayEnd;
-	for (int i = 0; i <= MapHeight; ++i)
+	for (int i = 0; i < gridSize.Y; ++i)
 	{
-		for (int j = 0; j <= MapWidth; ++j)
+		for (int j = 0; j < gridSize.X; ++j)
 		{
 			RayStart = { i * 100.f + 50, j * 100.f + 50, 300.f };
-			RayEnd = { i * 100.f + 50, j * 100.f + 50, 100.f };
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * MapWidth + j] == 255 ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
+			RayEnd = { i * 100.f + 50, j * 100.f + 50, -300.f };
+			UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * gridSize.X + j]);
+			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * gridSize.X + j] == 255 ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
 		}
 	}
 }
 
-void DebugDraw(UWorld* World, int MapWidth, int MapHeight, const TArray<IntegrationField> IntegrationFields)
+void DebugDraw(UWorld* World, const FIntVector2& gridSize, const TArray<IntegrationField>& IntegrationFields)
 {
 	FVector RayStart;
 	FVector RayEnd;
-	for (int i = 0; i <= MapHeight; ++i)
+	for (int i = 0; i < gridSize.Y; ++i)
 	{
-		for (int j = 0; j <= MapWidth; ++j)
+		for (int j = 0; j < gridSize.X; ++j)
 		{
 			RayStart = { i * 100.f + 50, j * 100.f + 50, 300.f };
 			RayEnd = { i * 100.f + 50, j * 100.f + 50, 100.f };
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, IntegrationFields[i * MapWidth + j].LOS == false ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
+			UE_LOG(LogUE5TopDownARPG, Log, TEXT("IntegrationFields [%d][%d] = [%d]"), i, j, (int)IntegrationFields[i * gridSize.X + j].LOS);
+			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, IntegrationFields[i * gridSize.X + j].LOS == false ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
 		}
 	}
 }
 
-void DebugDraw(UWorld* World, int MapWidth, int MapHeight, const TArray<FlowField>& FlowFields)
+void DebugDraw(UWorld* World, const FIntVector2& gridSize, const TArray<FlowField>& FlowFields)
 {
 	FVector RayStart;
 	FVector RayEnd;
@@ -90,11 +94,11 @@ void DebugDraw(UWorld* World, int MapWidth, int MapHeight, const TArray<FlowFiel
 	};
 	FVector2D offset;
 
-	for (int i = 0; i <= MapHeight; ++i)
+	for (int i = 0; i < gridSize.Y; ++i)
 	{
-		for (int j = 0; j <= MapWidth; ++j)
+		for (int j = 0; j < gridSize.X; ++j)
 		{
-			offset = directionOffsets[FlowFields[i * MapWidth + j].DirectionLookup];
+			offset = directionOffsets[FlowFields[i * gridSize.X + j].DirectionLookup];
 			RayStart = { i * 100.f + 50 - offset.X * 25, j * 100.f + 50 - offset.Y * 25, 50.f };
 			RayEnd = { i * 100.f + 50 + offset.X * 25, j * 100.f + 50 + offset.Y * 25, 50.f };
 
@@ -103,15 +107,50 @@ void DebugDraw(UWorld* World, int MapWidth, int MapHeight, const TArray<FlowFiel
 	}
 }
 
+namespace Eikonal {
+	const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
+
+	bool isValidCell(const TArray<uint8_t>& CostFields, const FIntVector2& gridSize, const FIntVector2& cell) {
+		return cell.X >= 0 && cell.X < gridSize.X && cell.Y >= 0 && cell.Y < gridSize.Y && CostFields[cell.Y * gridSize.X + cell.X] != UINT8_MAX;
+	}
+
+	void updateCell(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, const FIntVector2& gridSize, std::queue<FIntVector2>& wavefront, const FIntVector2& cell, float currentCost) {
+		if (isValidCell(CostFields, gridSize, cell)) {
+			float newCost = currentCost + CostFields[cell.Y * gridSize.X + cell.X];
+			float oldCost = IntegrationFields[cell.Y * gridSize.X + cell.X].IntegratedCost;
+
+			if (newCost < oldCost * SIGNIFICANT_COST_REDUCTION) {
+				IntegrationFields[cell.Y * gridSize.X + cell.X].IntegratedCost = newCost;
+				wavefront.push(cell);
+			}
+		}
+	}
+
+	void propagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, const FIntVector2& gridSize, std::queue<FIntVector2>& wavefront) {
+		while (!wavefront.empty()) {
+			FIntVector2 current = wavefront.front();
+			wavefront.pop();
+
+			float currentCost = IntegrationFields[current.Y * gridSize.X + current.X].IntegratedCost;
+
+			// Check adjacent cells: up, down, left, right
+			updateCell(CostFields, IntegrationFields, gridSize, wavefront, FIntVector2(current.X + 1, current.Y), currentCost);
+			updateCell(CostFields, IntegrationFields, gridSize, wavefront, FIntVector2(current.X - 1, current.Y), currentCost);
+			updateCell(CostFields, IntegrationFields, gridSize, wavefront, FIntVector2(current.X, current.Y + 1), currentCost);
+			updateCell(CostFields, IntegrationFields, gridSize, wavefront, FIntVector2(current.X, current.Y - 1), currentCost);
+		}
+	}
+}
+
 /*
 Direction is normalized
 */
-void BresenhamsRay2D(int MapHeight, int MapWidth, const TArray<uint8_t>& CostFields, const FVector2D& Direction, int PosX, int PosY, TArray<IntegrationField>& IntegrationFields)
+void BresenhamsRay2D(int MapHeight, int MapWidth, const TArray<uint8_t>& CostFields, const FVector2D& Direction, const FIntVector2& Pos, TArray<IntegrationField>& IntegrationFields)
 {
-	int x = PosX;
-	int y = PosY;
-	int endX = std::floor(PosX + Direction.X * MapWidth);
-	int endY = std::floor(PosY + Direction.Y * MapHeight);
+	int x = Pos.X;
+	int y = Pos.Y;
+	int endX = std::floor(Pos.X + Direction.X * MapWidth);
+	int endY = std::floor(Pos.Y + Direction.Y * MapHeight);
 
 	int dx = std::abs(endX - x);
 	int dy = -std::abs(endY - y);
@@ -141,24 +180,18 @@ void BresenhamsRay2D(int MapHeight, int MapWidth, const TArray<uint8_t>& CostFie
 	}
 }
 
-void LineOfSightPass(int MapHeight, int MapWidth, const FVector& Goal, OUT TArray<IntegrationField>& IntegrationFields)
+void LineOfSightPass(int MapHeight, int MapWidth, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields)
 {
 
 }
 
-void CalculateIntegrationFields(int MapHeight, int MapWidth, const FVector& Goal, OUT TArray<IntegrationField>& IntegrationFields)
-{
-	LineOfSightPass();
-
-}
-
-void CalculateFlowFields(int MapHeight, int MapWidth, const FVector& EndPos, OUT TArray<FlowField> FlowFields)
+void CalculateFlowFields(const FIntVector2& gridSize, const FIntVector2& EndPos, OUT TArray<FlowField> FlowFields)
 {
 
 
 }
 
-bool CalculateCostFields(UWorld* World, int MapHeight, int MapWidth, OUT TArray<uint8_t>& CostFields)
+bool CalculateCostFields(UWorld* World, const FIntVector2& gridSize, OUT TArray<uint8_t>& CostFields)
 {
 	if (IsValid(World))
 	{
@@ -169,18 +202,16 @@ bool CalculateCostFields(UWorld* World, int MapHeight, int MapWidth, OUT TArray<
 	FVector RayStart;
 	FVector RayEnd;
 	FHitResult OutHit;
-	for (int i = 0; i <= MapHeight; ++i)
+	for (int i = 0; i < gridSize.Y; ++i)
 	{
-		for (int j = 0; j <= MapWidth; ++j)
+		for (int j = 0; j < gridSize.X; ++j)
 		{
-			RayStart = FVector(i * 100 + 50, j * 100 + 50, 300);
-			RayEnd = FVector(i * 100 + 50, j * 100 + 50, 100);
+			RayStart = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, 300.f);
+			RayEnd = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, -300.f);
 			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
 			bool bLineTraceObstructed = World->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
 
-			CostFields[i * MapHeight + j] = bLineTraceObstructed ? 1 : 255;
-			UE_LOG(LogUE5TopDownARPG, Log, TEXT("Raycast at %s, %s: %d"), *(RayStart.ToString()), *(RayEnd.ToString()), (int)bLineTraceObstructed);
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, bLineTraceObstructed ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
+			CostFields[i * gridSize.X + j] = bLineTraceObstructed ? 1 : 255;
 		}
 	}
 	return true;
@@ -193,20 +224,27 @@ void DoFlowTiles(UWorld* World)
 		return;
 	}
 
-	int MapHeight = 30;
-	int MapWidth = 30;
+	FIntVector2 gridSize{ 30, 30 };
 	TArray<uint8_t> CostFields;
-	CostFields.Init(1, MapHeight * MapWidth);
-	CalculateCostFields(World, MapHeight, MapWidth, CostFields);
+	CostFields.Init(1, gridSize.X * gridSize.Y);
+	CalculateCostFields(World, gridSize, CostFields);
 
-	FVector Goal{ 27.f, 27.f, 1.f };
+	DebugDraw(World, gridSize, CostFields);
+
+	std::queue<FIntVector2> wavefront;
+	FIntVector2 Goal{ 27, 27 };
+	wavefront.push(Goal);
 	TArray<IntegrationField> IntegrationFields;
-	IntegrationFields.Init({ 1, 0, 0 }, MapHeight * MapWidth);
-	CalculateIntegrationFields(MapHeight, MapWidth, Goal, IntegrationFields);
+	IntegrationFields.Init({ 1, 0, 0 }, gridSize.X * gridSize.Y);
+	Eikonal::propagateWave(CostFields, IntegrationFields, gridSize, wavefront);
+
+	// DebugDraw(World, gridSize, IntegrationFields);
 
 	TArray<FlowField> FlowFields;
-	FlowFields.Init({ EDirection::North, 0, 0 }, MapHeight * MapWidth);
-	CalculateFlowFields(MapHeight, MapWidth, Goal, FlowFields);
+	FlowFields.Init({ EDirection::North, 0, 0 }, gridSize.X * gridSize.Y);
+	CalculateFlowFields(gridSize, Goal, FlowFields);
+
+	// DebugDraw(World, gridSize, FlowFields);
 }
 
 // TESTS
@@ -214,12 +252,6 @@ void DoFlowTiles(UWorld* World)
 bool Test_BresenhamsRay2D(UWorld* World)
 {
 	return false;
-}
-
-void MainFlowTiles(UWorld* World)
-{
-	// DoFlowTiles(World);
-	Test_BresenhamsRay2D(World);
 }
 
 
@@ -257,7 +289,7 @@ void AUE5TopDownARPGPlayerController::BeginPlay()
 		return;
 	}
 
-	MainFlowTiles(World);
+	DoFlowTiles(World);
 }
 
 void AUE5TopDownARPGPlayerController::SetupInputComponent()

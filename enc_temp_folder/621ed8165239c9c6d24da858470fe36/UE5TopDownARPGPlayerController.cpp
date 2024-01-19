@@ -12,17 +12,19 @@
 #include "EnhancedInputSubsystems.h"
 #include "UE5TopDownARPG.h"
 #include "NavigationSystem.h"
+#include "Engine/TextRenderActor.h"
+#include "Components/TextRenderComponent.h"
+#include "Internationalization/Text.h"
 #include <map>
 #include <queue>
 #include <climits>
 
 const int CELL_SIZE = 100;
+const int COST_TRACE_Y_START = 300;
+const int COST_TRACE_Y_END = 100;
 
 struct IntegrationField {
-	int MapWidth;
-	int MapHeight;
-
-	float IntegratedCost;
+	float IntegratedCost = FLT_MAX;
 	uint8_t ActiveWaveFront : 4;
 	uint8_t LOS : 4;
 };
@@ -52,32 +54,37 @@ void DebugDraw(UWorld* World, const FIntVector2& gridSize, const TArray<uint8_t>
 	{
 		for (int j = 0; j < gridSize.X; ++j)
 		{
-			RayStart = { i * 100.f + 50, j * 100.f + 50, 300.f };
-			RayEnd = { i * 100.f + 50, j * 100.f + 50, -300.f };
+			RayStart = { i * 100.f + 50, j * 100.f + 50, COST_TRACE_Y_START };
+			RayEnd = { i * 100.f + 50, j * 100.f + 50, COST_TRACE_Y_END };
 			UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * gridSize.X + j]);
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * gridSize.X + j] == 255 ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
+			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * gridSize.X + j] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
 		}
 	}
 }
 
 void DebugDraw(UWorld* World, const FIntVector2& gridSize, const TArray<IntegrationField>& IntegrationFields)
 {
-	FVector RayStart;
-	FVector RayEnd;
+	FlushPersistentDebugLines(World);
+	FVector TextStart;
 	for (int i = 0; i < gridSize.Y; ++i)
 	{
 		for (int j = 0; j < gridSize.X; ++j)
 		{
-			RayStart = { i * 100.f + 50, j * 100.f + 50, 300.f };
-			RayEnd = { i * 100.f + 50, j * 100.f + 50, 100.f };
-			UE_LOG(LogUE5TopDownARPG, Log, TEXT("IntegrationFields [%d][%d] = [%d]"), i, j, (int)IntegrationFields[i * gridSize.X + j].LOS);
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, IntegrationFields[i * gridSize.X + j].LOS == false ? FColor::Red : FColor::Green, true, 9999999.f, 0, 2.f);
+			TextStart = { i * CELL_SIZE + CELL_SIZE/2.f, j * CELL_SIZE + CELL_SIZE/2.f, 100.f };
+			auto IntegratedCost = FString::FromInt(IntegrationFields[i * gridSize.X + j].IntegratedCost);
+			UE_LOG(LogUE5TopDownARPG, Log, TEXT("IntegrationFields [%d][%d] = [%s]"), i, j, *IntegratedCost);
+
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+			auto TextActor = World->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), TextStart, FRotator(90,0,180), SpawnParameters);
+			TextActor->GetTextRender()->SetText(FText::FromString(IntegratedCost));
 		}
 	}
 }
 
 void DebugDraw(UWorld* World, const FIntVector2& gridSize, const TArray<FlowField>& FlowFields)
 {
+	FlushPersistentDebugLines(World);
 	FVector RayStart;
 	FVector RayEnd;
 
@@ -193,10 +200,7 @@ void CalculateFlowFields(const FIntVector2& gridSize, const FIntVector2& EndPos,
 
 bool CalculateCostFields(UWorld* World, const FIntVector2& gridSize, OUT TArray<uint8_t>& CostFields)
 {
-	if (IsValid(World))
-	{
-		return false;
-	}
+	ensure(World);
 
 	FVector HitLocation;
 	FVector RayStart;
@@ -206,12 +210,12 @@ bool CalculateCostFields(UWorld* World, const FIntVector2& gridSize, OUT TArray<
 	{
 		for (int j = 0; j < gridSize.X; ++j)
 		{
-			RayStart = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, 300.f);
-			RayEnd = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, -300.f);
+			RayStart = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, COST_TRACE_Y_START);
+			RayEnd = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, COST_TRACE_Y_END);
 			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
 			bool bLineTraceObstructed = World->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
 
-			CostFields[i * gridSize.X + j] = bLineTraceObstructed ? 1 : 255;
+			CostFields[i * gridSize.X + j] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}
 	}
 	return true;
@@ -219,26 +223,23 @@ bool CalculateCostFields(UWorld* World, const FIntVector2& gridSize, OUT TArray<
 
 void DoFlowTiles(UWorld* World)
 {
-	if (IsValid(World) == false)
-	{
-		return;
-	}
+	ensure(World);
 
 	FIntVector2 gridSize{ 30, 30 };
 	TArray<uint8_t> CostFields;
 	CostFields.Init(1, gridSize.X * gridSize.Y);
 	CalculateCostFields(World, gridSize, CostFields);
 
-	DebugDraw(World, gridSize, CostFields);
+//	DebugDraw(World, gridSize, CostFields);
 
 	std::queue<FIntVector2> wavefront;
 	FIntVector2 Goal{ 27, 27 };
 	wavefront.push(Goal);
 	TArray<IntegrationField> IntegrationFields;
-	IntegrationFields.Init({ 1, 0, 0 }, gridSize.X * gridSize.Y);
+	IntegrationFields.Init(IntegrationField(), gridSize.X * gridSize.Y);
 	Eikonal::propagateWave(CostFields, IntegrationFields, gridSize, wavefront);
 
-	// DebugDraw(World, gridSize, IntegrationFields);
+	DebugDraw(World, gridSize, IntegrationFields);
 
 	TArray<FlowField> FlowFields;
 	FlowFields.Init({ EDirection::North, 0, 0 }, gridSize.X * gridSize.Y);
@@ -284,10 +285,7 @@ void AUE5TopDownARPGPlayerController::BeginPlay()
 	}
 
 	UWorld* World = GetWorld();
-	if (IsValid(World) == false)
-	{
-		return;
-	}
+	ensure(World);
 
 	DoFlowTiles(World);
 }

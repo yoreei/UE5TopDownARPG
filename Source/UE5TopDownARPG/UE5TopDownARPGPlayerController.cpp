@@ -72,14 +72,14 @@ struct IntegrationField {
 
 void DebugDraw(UWorld* World, const TArray<uint8_t>& CostFields)
 {
-	for (int i = 0; i < GRIDSIZE.Y; ++i)
+	for (int y = 0; y < GRIDSIZE.Y; ++y)
 	{
-		for (int j = 0; j < GRIDSIZE.X; ++j)
+		for (int x = 0; x < GRIDSIZE.X; ++x)
 		{
-			FVector RayStart = COST_TRACE_Y_START + FVector(i * CELL_SIZE + CELL_SIZE / 2, j* CELL_SIZE + CELL_SIZE / 2, 0.f);
+			FVector RayStart = COST_TRACE_Y_START + FVector(x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2, 0.f);
 			FVector RayEnd = RayStart + COST_TRACE_DIRECTION;
-			UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GRIDSIZE.X + j]);
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * GRIDSIZE.X + j] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
+			// UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GRIDSIZE.X + j]);
+			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[y * GRIDSIZE.X + x] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
 		}
 	}
 }
@@ -87,19 +87,19 @@ void DebugDraw(UWorld* World, const TArray<uint8_t>& CostFields)
 void DebugDraw(UWorld* World, const TArray<IntegrationField>& IntegrationFields)
 {
 	FlushPersistentDebugLines(World);
-	FVector TextStart;
-	for (int i = 0; i < GRIDSIZE.Y; ++i)
+
+	for (int y = 0; y < GRIDSIZE.Y; ++y)
 	{
-		for (int j = 0; j < GRIDSIZE.X; ++j)
+		for (int x = 0; x < GRIDSIZE.X; ++x)
 		{
-			TextStart = { i * CELL_SIZE + CELL_SIZE/2.f, j * CELL_SIZE + CELL_SIZE/2.f, 60.f };
-			auto IntegratedCost = FString::FromInt(IntegrationFields[i * GRIDSIZE.X + j].IntegratedCost);
-			if (IntegrationFields[i * GRIDSIZE.X + j].IntegratedCost == FLT_MAX)
+			FVector TextStart = { x * CELL_SIZE + CELL_SIZE/2.f, y * CELL_SIZE + CELL_SIZE/2.f, 60.f };
+			auto IntegratedCost = FString::FromInt(IntegrationFields[y * GRIDSIZE.X + x].IntegratedCost);
+			if (IntegrationFields[y * GRIDSIZE.X + x].IntegratedCost == FLT_MAX)
 			{
 				IntegratedCost = "MAX";
 			}
 
-			UE_LOG(LogUE5TopDownARPG, Log, TEXT("IntegrationFields [%d][%d] = [%s]"), i, j, *IntegratedCost);
+			// UE_LOG(LogUE5TopDownARPG, Log, TEXT("IntegrationFields [%d][%d] = [%s]"), i, j, *IntegratedCost);
 
 			FActorSpawnParameters SpawnParameters;
 			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
@@ -124,14 +124,14 @@ void DebugDraw(UWorld* World, const TArray<FlowField>& FlowFields)
 	FVector Ray{ 0.f, 0.f, 50.f };
 	FVector Offset;
 
-	for (int i = 0; i < GRIDSIZE.Y; ++i)
+	for (int y = 0; y < GRIDSIZE.Y; ++y)
 	{
-		for (int j = 0; j < GRIDSIZE.X; ++j)
+		for (int x = 0; x < GRIDSIZE.X; ++x)
 		{
-			if (FlowFields[i * GRIDSIZE.X + j].Completed == false)
+			if (FlowFields[y * GRIDSIZE.X + x].Completed == false)
 			{
 				FMatrix Transformation = FMatrix::Identity;
-				Transformation.SetOrigin({ i * 100.f + 50 , j * 100.f + 50 , 50.f });
+				Transformation.SetOrigin({ x * 100.f + 50 , y * 100.f + 50 , 50.f });
 				FMatrix Rotation = FRotationMatrix({ 90.f, 0.f, 180.f });
 
 				FMatrix DonutMatrix = Rotation * Transformation;
@@ -139,18 +139,20 @@ void DebugDraw(UWorld* World, const TArray<FlowField>& FlowFields)
 			}
 			else
 			{
-				Dirs::EDirection Dir = FlowFields[i * GRIDSIZE.X + j].Dir;
+				Dirs::EDirection Dir = FlowFields[y * GRIDSIZE.X + x].Dir;
 				Offset = ToFVector(Dirs::DIRS.at(Dir)) * 25;
-				Ray.X = i * 100.f + 50;
-				Ray.Y = j * 100.f + 50;
+				Ray.Y = y * 100.f + 50;
+				Ray.X = x * 100.f + 50;
 
 				FVector Start = Ray - Offset;
 				FVector End = Ray + Offset;
 
 				DrawDebugDirectionalArrow(World, Start, End, 3.f, FColor::Green, true, 9999999.f, 0, 2.f);
-			}
-			UE_LOG(LogUE5TopDownARPG, Log, TEXT("FlowFields [%d][%d].Dir = [%d]"), i, j, (int)FlowFields[i * GRIDSIZE.X + j].Dir);
 
+				UE_LOG(LogUE5TopDownARPG, Log, TEXT("FlowFields[%d][%d].Dir = [%d]"), y, x, (int)FlowFields[y * GRIDSIZE.X + x].Dir);
+				UE_LOG(LogUE5TopDownARPG, Log, TEXT("Start = %s"), *Start.ToString());
+				UE_LOG(LogUE5TopDownARPG, Log, TEXT("End = %s"), *End.ToString());
+			}
 		}
 	}
 }
@@ -307,7 +309,7 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 
 		float BestCost = IntegrationFields[CurIdx].IntegratedCost;
 		Dirs::EDirection BestDir;
-		int BestIdx = CurIdx;
+		int BestIdx = ApplyDir(CurIdx, Dirs::DIRS.at(BestDir));
 
 		for (const auto& pair : Dirs::DIRS) {
 			Dirs::EDirection NewDir = pair.first;
@@ -329,6 +331,7 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 		FlowFields[CurIdx].Dir = BestDir;
 		FlowFields[CurIdx].Completed = true;
 		Sources.push(BestIdx);
+		
 		UE_LOG(LogUE5TopDownARPG, Log, TEXT("CalculateFlowFields [%d].Dir = %d"), CurIdx, FlowFields[CurIdx].Dir);
 	}
 }
@@ -339,16 +342,16 @@ bool CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields)
 
 	FVector HitLocation;
 	FHitResult OutHit;
-	for (int i = 0; i < GRIDSIZE.Y; ++i)
+	for (int y = 0; y < GRIDSIZE.Y; ++y)
 	{
-		for (int j = 0; j < GRIDSIZE.X; ++j)
+		for (int x = 0; x < GRIDSIZE.X; ++x)
 		{
-			FVector RayStart = COST_TRACE_Y_START + FVector(i * CELL_SIZE + CELL_SIZE / 2, j * CELL_SIZE + CELL_SIZE / 2, 0.f);
+			FVector RayStart = COST_TRACE_Y_START + FVector(x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2, 0.f);
 			FVector RayEnd = RayStart + COST_TRACE_DIRECTION;
 			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
 			bool bLineTraceObstructed = World->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
 
-			CostFields[i * GRIDSIZE.X + j] = bLineTraceObstructed ? UINT8_MAX : 1;
+			CostFields[y * GRIDSIZE.X + x] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}
 	}
 	return true;
@@ -379,11 +382,11 @@ void DoFlowTiles(UWorld* World)
 	TArray<FlowField> FlowFields;
 	FlowFields.Init({Dirs::EDirection(), false, 0}, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
 	std::queue<int> Sources; // TODO optimize
+	//Sources.push(25 * GRIDSIZE.X + 27);
 	Sources.push(2 * GRIDSIZE.X + 2);
 	Sources.push(27 * GRIDSIZE.X + 2);
 	Sources.push(2 * GRIDSIZE.X + 27);
 	Sources.push(10 * GRIDSIZE.X + 20);
-	UE_LOG(LogUE5TopDownARPG, Log, TEXT("before CalculateFlowFields"));
 	CalculateFlowFields(IntegrationFields, Sources, FlowFields);
 
 	DebugDraw(World, FlowFields);

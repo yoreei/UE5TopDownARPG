@@ -19,9 +19,50 @@
 #include <queue>
 #include <climits>
 
-const int CELL_SIZE = 100;
-const int COST_TRACE_Y_START = 300;
-const int COST_TRACE_Y_END = 100;
+const float CELL_SIZE = 100.f;
+const FVector COST_TRACE_Y_START = { 0.f, 0.f, 250.f };
+const FVector COST_TRACE_DIRECTION {0.f, 0.f, -100};
+const FIntVector2 GRIDSIZE{ 30, 30 };
+
+namespace Dirs
+{
+	enum EDirection : uint8_t {
+		SouthWest = 0,
+		West,
+		NorthWest,
+		North,
+		NorthEast,
+		East,
+		SouthEast,
+		South
+	};
+
+	static const std::map<EDirection, FIntVector2> DIRS = { //TODO OPTIMIZE FLAGS
+	{ EDirection::SouthWest,  {-1, -1} },
+	{ EDirection::West,       {-1, 0 } },
+	{ EDirection::NorthWest,  {-1, 1 } },
+	{ EDirection::North,      { 0, 1 } },
+	{ EDirection::NorthEast,  { 1, 1 } },
+	{ EDirection::East,       { 1, 0 } },
+	{ EDirection::SouthEast,  { 1, -1} },
+	{ EDirection::South,      { 0, -1} }
+	};
+
+	static const bool IsDiagonal(EDirection Dir) { return Dir % 2 == 0; }
+	static const FIntVector2 Next(EDirection Dir) { return DIRS.at( EDirection((Dir + 1) % 8) ); }
+	static const FIntVector2 Prev(EDirection Dir) { return DIRS.at( EDirection((Dir + 7) % 8) ); }
+}
+
+static const int ApplyDir(const int Idx, const FIntVector2& Dir) {
+	int Result = Idx + Dir.Y * GRIDSIZE.X + Dir.X;
+	return Result;
+}
+
+struct FlowField {
+	Dirs::EDirection Dir : 4;
+	uint8_t Completed : 1; // TODO Change this to Pathable in next version
+	uint8_t LOS : 1;       // NOT USED YET
+};
 
 struct IntegrationField {
 	float IntegratedCost = FLT_MAX;
@@ -29,51 +70,31 @@ struct IntegrationField {
 	uint8_t LOS : 4;
 };
 
-enum class EDirection : uint8_t {
-	Unset = 0,
-	North,
-	NorthEast,
-	East,
-	SouthEast,
-	South,
-	SouthWest,
-	West,
-	NorthWest
-};
-
-struct FlowField {
-	EDirection DirectionLookup : 4;
-	uint8_t Pathable : 2;
-	uint8_t LOS : 2;
-};
-
-void DebugDraw(UWorld* World, const FIntVector2& GridSize, const TArray<uint8_t>& CostFields)
+void DebugDraw(UWorld* World, const TArray<uint8_t>& CostFields)
 {
-	FVector RayStart;
-	FVector RayEnd;
-	for (int i = 0; i < GridSize.Y; ++i)
+	for (int i = 0; i < GRIDSIZE.Y; ++i)
 	{
-		for (int j = 0; j < GridSize.X; ++j)
+		for (int j = 0; j < GRIDSIZE.X; ++j)
 		{
-			RayStart = { i * 100.f + 50, j * 100.f + 50, COST_TRACE_Y_START };
-			RayEnd = { i * 100.f + 50, j * 100.f + 50, COST_TRACE_Y_END };
-			UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GridSize.X + j]);
-			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * GridSize.X + j] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
+			FVector RayStart = COST_TRACE_Y_START + FVector(i * CELL_SIZE + CELL_SIZE / 2, j* CELL_SIZE + CELL_SIZE / 2, 0.f);
+			FVector RayEnd = RayStart + COST_TRACE_DIRECTION;
+			UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GRIDSIZE.X + j]);
+			DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[i * GRIDSIZE.X + j] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
 		}
 	}
 }
 
-void DebugDraw(UWorld* World, const FIntVector2& GridSize, const TArray<IntegrationField>& IntegrationFields)
+void DebugDraw(UWorld* World, const TArray<IntegrationField>& IntegrationFields)
 {
 	FlushPersistentDebugLines(World);
 	FVector TextStart;
-	for (int i = 0; i < GridSize.Y; ++i)
+	for (int i = 0; i < GRIDSIZE.Y; ++i)
 	{
-		for (int j = 0; j < GridSize.X; ++j)
+		for (int j = 0; j < GRIDSIZE.X; ++j)
 		{
 			TextStart = { i * CELL_SIZE + CELL_SIZE/2.f, j * CELL_SIZE + CELL_SIZE/2.f, 60.f };
-			auto IntegratedCost = FString::FromInt(IntegrationFields[i * GridSize.X + j].IntegratedCost);
-			if (IntegrationFields[i * GridSize.X + j].IntegratedCost == FLT_MAX)
+			auto IntegratedCost = FString::FromInt(IntegrationFields[i * GRIDSIZE.X + j].IntegratedCost);
+			if (IntegrationFields[i * GRIDSIZE.X + j].IntegratedCost == FLT_MAX)
 			{
 				IntegratedCost = "MAX";
 			}
@@ -88,43 +109,47 @@ void DebugDraw(UWorld* World, const FIntVector2& GridSize, const TArray<Integrat
 	}
 }
 
-void DebugDraw(UWorld* World, const FIntVector2& GridSize, const TArray<FlowField>& FlowFields)
+void DebugDraw(UWorld* World, const TArray<FlowField>& FlowFields)
 {
-	FlushPersistentDebugLines(World);
-	FVector RayStart;
-	FVector RayEnd;
-
-	std::map<EDirection, FVector2D> directionOffsets =
+	auto ToFVector = [](const FIntVector2& IntVector2)
 	{
-		{EDirection::North, FVector2D(0, 25)},
-		{EDirection::NorthEast, FVector2D(25, 25)},
-		{EDirection::East, FVector2D(25, 0)},
-		{EDirection::SouthEast, FVector2D(25, -25)},
-		{EDirection::South, FVector2D(0, -25)},
-		{EDirection::SouthWest, FVector2D(-25, -25)},
-		{EDirection::West, FVector2D(-25, 0)},
-		{EDirection::NorthWest, FVector2D(-25, -25)},
+		FVector Result;
+		Result.X = static_cast<float>(IntVector2.X);
+		Result.Y = static_cast<float>(IntVector2.Y);
+		Result.Z = 0;
+		return Result;
 	};
-	FVector2D offset;
 
-	for (int i = 0; i < GridSize.Y; ++i)
+	FlushPersistentDebugLines(World);
+	FVector Ray{ 0.f, 0.f, 50.f };
+	FVector Offset;
+
+	for (int i = 0; i < GRIDSIZE.Y; ++i)
 	{
-		for (int j = 0; j < GridSize.X; ++j)
+		for (int j = 0; j < GRIDSIZE.X; ++j)
 		{
-			if (FlowFields[i * GridSize.X + j].DirectionLookup == EDirection::Unset)
+			if (FlowFields[i * GRIDSIZE.X + j].Completed == false)
 			{
-				FVector DonutLoc{ i * 100.f + 50 , j * 100.f + 50 , 50.f };
-				FMatrix TransformMatrix = FMatrix::Identity;
-				TransformMatrix.SetOrigin(DonutLoc);
-				DrawDebug2DDonut(World, TransformMatrix, 5.f, 10.f, 16, FColor::Blue, true);
+				FMatrix Transformation = FMatrix::Identity;
+				Transformation.SetOrigin({ i * 100.f + 50 , j * 100.f + 50 , 50.f });
+				FMatrix Rotation = FRotationMatrix({ 90.f, 0.f, 180.f });
+
+				FMatrix DonutMatrix = Rotation * Transformation;
+				DrawDebug2DDonut(World, DonutMatrix, 5.f, 10.f, 16, FColor::Blue, true);
 			}
 			else
 			{
-				offset = directionOffsets[FlowFields[i * GridSize.X + j].DirectionLookup];
-				RayStart = { i * 100.f + 50 - offset.X, j * 100.f + 50 - offset.Y, 50.f };
-				RayEnd = { i * 100.f + 50 + offset.X, j * 100.f + 50 + offset.Y, 50.f };
-				DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.f, FColor::Green, true, 9999999.f, 0, 2.f);
+				Dirs::EDirection Dir = FlowFields[i * GRIDSIZE.X + j].Dir;
+				Offset = ToFVector(Dirs::DIRS.at(Dir)) * 25;
+				Ray.X = i * 100.f + 50;
+				Ray.Y = j * 100.f + 50;
+
+				FVector Start = Ray - Offset;
+				FVector End = Ray + Offset;
+
+				DrawDebugDirectionalArrow(World, Start, End, 3.f, FColor::Green, true, 9999999.f, 0, 2.f);
 			}
+			UE_LOG(LogUE5TopDownARPG, Log, TEXT("FlowFields [%d][%d].Dir = [%d]"), i, j, (int)FlowFields[i * GRIDSIZE.X + j].Dir);
 
 		}
 	}
@@ -133,35 +158,35 @@ void DebugDraw(UWorld* World, const FIntVector2& GridSize, const TArray<FlowFiel
 namespace Eikonal {
 	const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
 
-	bool isValidCell(const TArray<uint8_t>& CostFields, const FIntVector2& GridSize, const FIntVector2& cell) { // TODO can we reuse?
-		return cell.X >= 0 && cell.X < GridSize.X && cell.Y >= 0 && cell.Y < GridSize.Y && CostFields[cell.Y * GridSize.X + cell.X] != UINT8_MAX;
+	bool isValidCell(const TArray<uint8_t>& CostFields, const FIntVector2& cell) { // TODO can we reuse?
+		return cell.X >= 0 && cell.X < GRIDSIZE.X && cell.Y >= 0 && cell.Y < GRIDSIZE.Y && CostFields[cell.Y * GRIDSIZE.X + cell.X] != UINT8_MAX;
 	}
 
-	void updateCell(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, const FIntVector2& GridSize, std::queue<FIntVector2>& WaveFront, const FIntVector2& cell, float currentCost) {
-		if (isValidCell(CostFields, GridSize, cell)) {
-			float newCost = currentCost + CostFields[cell.Y * GridSize.X + cell.X];
-			float oldCost = IntegrationFields[cell.Y * GridSize.X + cell.X].IntegratedCost;
+	void updateCell(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& cell, float currentCost) {
+		if (isValidCell(CostFields, cell)) {
+			float newCost = currentCost + CostFields[cell.Y * GRIDSIZE.X + cell.X];
+			float oldCost = IntegrationFields[cell.Y * GRIDSIZE.X + cell.X].IntegratedCost;
 
 			if (newCost < oldCost * SIGNIFICANT_COST_REDUCTION) {
-				IntegrationFields[cell.Y * GridSize.X + cell.X].IntegratedCost = newCost;
+				IntegrationFields[cell.Y * GRIDSIZE.X + cell.X].IntegratedCost = newCost;
 				WaveFront.push(cell);
 			}
 		}
 	}
 
-	void propagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, const FIntVector2& GridSize, std::queue<FIntVector2>& WaveFront) {
+	void propagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront) {
 
 		while (!WaveFront.empty()) {
 			FIntVector2 current = WaveFront.front();
 			WaveFront.pop();
 
-			float currentCost = IntegrationFields[current.Y * GridSize.X + current.X].IntegratedCost;
+			float currentCost = IntegrationFields[current.Y * GRIDSIZE.X + current.X].IntegratedCost;
 
 			// Check adjacent cells: up, down, left, right
-			updateCell(CostFields, IntegrationFields, GridSize, WaveFront, FIntVector2(current.X + 1, current.Y), currentCost);
-			updateCell(CostFields, IntegrationFields, GridSize, WaveFront, FIntVector2(current.X - 1, current.Y), currentCost);
-			updateCell(CostFields, IntegrationFields, GridSize, WaveFront, FIntVector2(current.X, current.Y + 1), currentCost);
-			updateCell(CostFields, IntegrationFields, GridSize, WaveFront, FIntVector2(current.X, current.Y - 1), currentCost);
+			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X + 1, current.Y), currentCost);
+			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X - 1, current.Y), currentCost);
+			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X, current.Y + 1), currentCost);
+			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X, current.Y - 1), currentCost);
 		}
 	}
 }
@@ -209,71 +234,121 @@ void LineOfSightPass(int MapHeight, int MapWidth, const FIntVector2& Goal, OUT T
 	// TODO Implement
 }
 
-bool IsValidIdx(const FIntVector2& GridSize, int Idx)
+bool IsValidIdx(int Idx)
 {
-	return Idx >= 0 && Idx < GridSize.X * GridSize.Y;
+	return Idx >= 0 && Idx < GRIDSIZE.X * GRIDSIZE.Y;
 }
 
-void CalculateFlowFields(const FIntVector2& GridSize, TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields)
+//void CalculateFlowFields(const FIntVector2& GRIDSIZE, TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields)
+//{
+//	UE_LOG(LogUE5TopDownARPG, Log, TEXT("passed through here"));
+//
+//	auto UpdateIfBetter = [&GRIDSIZE, &IntegrationFields](const int NextIdx, constDirs::EDirection NextDir, OUT int& BestIdx, OUT float& BestCost, OUTDirs::EDirection& BestDir) {
+//		if (NextIdx >= 0 && NextIdx < GRIDSIZE.X * GRIDSIZE.Y)
+//		{
+//			if (BestCost > IntegrationFields[NextIdx].IntegratedCost)
+//			{
+//				BestIdx = NextIdx;
+//				BestCost = IntegrationFields[NextIdx].IntegratedCost;
+//				BestDir = NextDir;
+//
+//			}
+//		}
+//	};
+//
+//	while (Sources.empty() == false)
+//	{
+//		const int CurIdx = Sources.front();
+//		Sources.pop();
+//		check(IsValidIdx(GRIDSIZE, CurIdx)); // TODO optimize: executed twice for each Idx
+//
+//		if (FlowFields[CurIdx].Dir !=Dirs::EDirection::Unset || IntegrationFields[CurIdx].IntegratedCost == 0) // Reached other solution or goal
+//		{
+//			continue;
+//		}
+//
+//		float BestCost = IntegrationFields[CurIdx].IntegratedCost;
+//		EDirection BestDir =Dirs::EDirection::Unset;
+//		int BestIdx = CurIdx;
+//		const int NorthIdx = CurIdx + GRIDSIZE.X; // TODO optimize
+//		const int EastIdx = CurIdx + 1;
+//		const int SouthIdx = CurIdx - GRIDSIZE.X;
+//		const int WestIdx = CurIdx - 1;
+//
+//		UpdateIfBetter(NorthIdx,Dirs::EDirection::North, OUT BestIdx, OUT BestCost, OUT BestDir);
+//		UpdateIfBetter(EastIdx,Dirs::EDirection::East, OUT BestIdx, OUT BestCost, OUT BestDir);
+//		UpdateIfBetter(SouthIdx,Dirs::EDirection::South, OUT BestIdx, OUT BestCost, OUT BestDir);
+//		UpdateIfBetter(WestIdx,Dirs::EDirection::West, OUT BestIdx, OUT BestCost, OUT BestDir);
+//
+//		FlowFields[CurIdx].Dir = BestDir;
+//		Sources.push(BestIdx);
+//		// TODO diagonal
+//	}
+//
+//}
+
+void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields)
 {
-	auto UpdateIfBetter = [&GridSize, &IntegrationFields](const int NextIdx, const EDirection NextDir, OUT float& BestCost, OUT EDirection& BestDir) {
-		if (NextIdx >= 0 && NextIdx < GridSize.X * GridSize.Y)
-		{
-			if (BestCost > IntegrationFields[NextIdx].IntegratedCost)
-			{
-				BestDir = NextDir;
-				BestCost = IntegrationFields[NextIdx].IntegratedCost;
-			}
-		}
+
+	auto DiagonalReachable = [&IntegrationFields](const int CurIdx, const Dirs::EDirection NewDir) {
+		return IntegrationFields[ApplyDir(CurIdx, Next(NewDir))].IntegratedCost != FLT_MAX && IntegrationFields[ApplyDir(CurIdx, Prev(NewDir))].IntegratedCost != FLT_MAX; // TODO change to binary comparison?
 	};
 
 	while (Sources.empty() == false)
 	{
 		const int CurIdx = Sources.front();
 		Sources.pop();
-		check(IsValidIdx(GridSize, CurIdx)); // TODO optimize: executed twice for each Idx
+		check(IsValidIdx(CurIdx)); // TODO optimize: executed twice for each Idx
 
-		if (FlowFields[CurIdx].DirectionLookup != EDirection::Unset)
+		if (FlowFields[CurIdx].Completed || IntegrationFields[CurIdx].IntegratedCost == 0) // Reached other solution or goal
 		{
 			continue;
 		}
 
 		float BestCost = IntegrationFields[CurIdx].IntegratedCost;
-		EDirection BestDir = EDirection::Unset;
-		const int NorthIdx = CurIdx + GridSize.X; // TODO optimize
-		const int EastIdx = CurIdx + 1;
-		const int SouthIdx = CurIdx - GridSize.X;
-		const int WestIdx = CurIdx - 1;
+		Dirs::EDirection BestDir;
+		int BestIdx = CurIdx;
 
-		UpdateIfBetter(NorthIdx, EDirection::North, OUT BestCost, OUT BestDir);
-		UpdateIfBetter(EastIdx, EDirection::East, OUT BestCost, OUT BestDir);
-		UpdateIfBetter(SouthIdx, EDirection::South, OUT BestCost, OUT BestDir);
-		UpdateIfBetter(WestIdx, EDirection::West, OUT BestCost, OUT BestDir);
+		for (const auto& pair : Dirs::DIRS) {
+			Dirs::EDirection NewDir = pair.first;
+			int NewIdx = ApplyDir(CurIdx, pair.second);
 
-		FlowFields[CurIdx].DirectionLookup = BestDir;
-		// TODO diagonal
+			if (IsValidIdx(NewIdx) && IntegrationFields[NewIdx].IntegratedCost != FLT_MAX) { // TODO change to binary comparison?
+
+				if (Dirs::IsDiagonal(NewDir) && DiagonalReachable(CurIdx, NewDir) == false) continue;
+
+				if (BestCost > IntegrationFields[NewIdx].IntegratedCost)
+				{
+					BestIdx = NewIdx;
+					BestCost = IntegrationFields[NewIdx].IntegratedCost;
+					BestDir = NewDir;
+
+				}
+			}
+		}
+		FlowFields[CurIdx].Dir = BestDir;
+		FlowFields[CurIdx].Completed = true;
+		Sources.push(BestIdx);
+		UE_LOG(LogUE5TopDownARPG, Log, TEXT("CalculateFlowFields [%d].Dir = %d"), CurIdx, FlowFields[CurIdx].Dir);
 	}
-
 }
 
-bool CalculateCostFields(UWorld* World, const FIntVector2& GridSize, OUT TArray<uint8_t>& CostFields)
+bool CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields)
 {
 	ensure(World);
 
 	FVector HitLocation;
-	FVector RayStart;
-	FVector RayEnd;
 	FHitResult OutHit;
-	for (int i = 0; i < GridSize.Y; ++i)
+	for (int i = 0; i < GRIDSIZE.Y; ++i)
 	{
-		for (int j = 0; j < GridSize.X; ++j)
+		for (int j = 0; j < GRIDSIZE.X; ++j)
 		{
-			RayStart = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, COST_TRACE_Y_START);
-			RayEnd = FVector(i * CELL_SIZE + CELL_SIZE/2, j * CELL_SIZE + CELL_SIZE/2, COST_TRACE_Y_END);
+			FVector RayStart = COST_TRACE_Y_START + FVector(i * CELL_SIZE + CELL_SIZE / 2, j * CELL_SIZE + CELL_SIZE / 2, 0.f);
+			FVector RayEnd = RayStart + COST_TRACE_DIRECTION;
 			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
 			bool bLineTraceObstructed = World->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
 
-			CostFields[i * GridSize.X + j] = bLineTraceObstructed ? UINT8_MAX : 1;
+			CostFields[i * GRIDSIZE.X + j] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}
 	}
 	return true;
@@ -282,37 +357,36 @@ bool CalculateCostFields(UWorld* World, const FIntVector2& GridSize, OUT TArray<
 void DoFlowTiles(UWorld* World)
 {
 	ensure(World);
-
-	FIntVector2 GridSize{ 30, 30 };
 	TArray<uint8_t> CostFields;
-	CostFields.Init(1, GridSize.X * GridSize.Y);
-	CalculateCostFields(World, GridSize, CostFields);
+	CostFields.Init(1, GRIDSIZE.X * GRIDSIZE.Y);
+	CalculateCostFields(World, CostFields);
 
-//	DebugDraw(World, GridSize, CostFields);
+	DebugDraw(World, CostFields);
 
 	std::queue<FIntVector2> WaveFront;
 	FIntVector2 Goal{ 27, 27 };
 	WaveFront.push(Goal);
 	TArray<IntegrationField> IntegrationFields;
-	IntegrationFields.Init(IntegrationField(), GridSize.X * GridSize.Y);
+	IntegrationFields.Init(IntegrationField(), GRIDSIZE.X * GRIDSIZE.Y);
 	// runLos()
 	// remove after runLos() is implemented
-	IntegrationFields[Goal.Y * GridSize.X + Goal.X].IntegratedCost = 0;
+	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].IntegratedCost = 0;
 
-	Eikonal::propagateWave(CostFields, IntegrationFields, GridSize, WaveFront);
+	Eikonal::propagateWave(CostFields, IntegrationFields, WaveFront);
 
-	DebugDraw(World, GridSize, IntegrationFields);
+	DebugDraw(World, IntegrationFields);
 
 	TArray<FlowField> FlowFields;
-	FlowFields.Init({ EDirection::Unset, 0, 0 }, GridSize.X * GridSize.Y); // TODO optimize: can we omit constructing these?
+	FlowFields.Init({Dirs::EDirection(), false, 0}, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
 	std::queue<int> Sources; // TODO optimize
-	Sources.push(2 * GridSize.X + 2);
-	Sources.push(27 * GridSize.X + 2);
-	Sources.push(2 * GridSize.X + 27);
-	Sources.push(10 * GridSize.X + 20);
-	CalculateFlowFields(GridSize, IntegrationFields, Sources, FlowFields);
+	Sources.push(2 * GRIDSIZE.X + 2);
+	Sources.push(27 * GRIDSIZE.X + 2);
+	Sources.push(2 * GRIDSIZE.X + 27);
+	Sources.push(10 * GRIDSIZE.X + 20);
+	UE_LOG(LogUE5TopDownARPG, Log, TEXT("before CalculateFlowFields"));
+	CalculateFlowFields(IntegrationFields, Sources, FlowFields);
 
-	DebugDraw(World, GridSize, FlowFields);
+	DebugDraw(World, FlowFields);
 }
 
 // TESTS

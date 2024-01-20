@@ -160,35 +160,43 @@ void DebugDraw(UWorld* World, const TArray<FlowField>& FlowFields)
 namespace Eikonal {
 	const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
 
-	bool isValidCell(const TArray<uint8_t>& CostFields, const FIntVector2& cell) { // TODO can we reuse?
-		return cell.X >= 0 && cell.X < GRIDSIZE.X && cell.Y >= 0 && cell.Y < GRIDSIZE.Y && CostFields[cell.Y * GRIDSIZE.X + cell.X] != UINT8_MAX;
+	bool IsInGrid(const TArray<uint8_t>& CostFields, const FIntVector2& Cell) { // TODO can we reuse?
+		return Cell.X >= 0 && Cell.X < GRIDSIZE.X && Cell.Y >= 0 && Cell.Y < GRIDSIZE.Y && CostFields[Cell.Y * GRIDSIZE.X + Cell.X] != UINT8_MAX;
 	}
 
-	void updateCell(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& cell, float currentCost) {
-		if (isValidCell(CostFields, cell)) {
-			float newCost = currentCost + CostFields[cell.Y * GRIDSIZE.X + cell.X];
-			float oldCost = IntegrationFields[cell.Y * GRIDSIZE.X + cell.X].IntegratedCost;
+	bool IsWall(const TArray<uint8_t>& CostFields, const FIntVector2& Cell)
+	{
+		return CostFields[Cell.Y * GRIDSIZE.X + Cell.X] == UINT8_MAX;
+	}
 
-			if (newCost < oldCost * SIGNIFICANT_COST_REDUCTION) {
-				IntegrationFields[cell.Y * GRIDSIZE.X + cell.X].IntegratedCost = newCost;
-				WaveFront.push(cell);
-			}
+	void UpdateCell(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost) {
+		if (IsInGrid(CostFields, Cell) == false) { return; }
+
+		if (IsWall(CostFields, Cell))
+		{
+			return; // TODO figure out LOS
+		}
+		float NewCost = CurrentCost + CostFields[Cell.Y * GRIDSIZE.X + Cell.X];
+		float OldCost = IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].IntegratedCost;
+
+		if (NewCost < OldCost * SIGNIFICANT_COST_REDUCTION) {
+			IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].IntegratedCost = NewCost;
+			WaveFront.push(Cell);
 		}
 	}
 
-	void propagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront) {
+	void PropagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront) {
 
 		while (!WaveFront.empty()) {
-			FIntVector2 current = WaveFront.front();
+			FIntVector2 Current = WaveFront.front();
 			WaveFront.pop();
 
-			float currentCost = IntegrationFields[current.Y * GRIDSIZE.X + current.X].IntegratedCost;
+			float CurrentCost = IntegrationFields[Current.Y * GRIDSIZE.X + Current.X].IntegratedCost;
 
-			// Check adjacent cells: up, down, left, right
-			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X + 1, current.Y), currentCost);
-			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X - 1, current.Y), currentCost);
-			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X, current.Y + 1), currentCost);
-			updateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(current.X, current.Y - 1), currentCost);
+			UpdateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X + 1, Current.Y), CurrentCost);
+			UpdateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X - 1, Current.Y), CurrentCost);
+			UpdateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X, Current.Y + 1), CurrentCost);
+			UpdateCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X, Current.Y - 1), CurrentCost);
 		}
 	}
 }
@@ -240,54 +248,6 @@ bool IsValidIdx(int Idx)
 {
 	return Idx >= 0 && Idx < GRIDSIZE.X * GRIDSIZE.Y;
 }
-
-//void CalculateFlowFields(const FIntVector2& GRIDSIZE, TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields)
-//{
-//	UE_LOG(LogUE5TopDownARPG, Log, TEXT("passed through here"));
-//
-//	auto UpdateIfBetter = [&GRIDSIZE, &IntegrationFields](const int NextIdx, constDirs::EDirection NextDir, OUT int& BestIdx, OUT float& BestCost, OUTDirs::EDirection& BestDir) {
-//		if (NextIdx >= 0 && NextIdx < GRIDSIZE.X * GRIDSIZE.Y)
-//		{
-//			if (BestCost > IntegrationFields[NextIdx].IntegratedCost)
-//			{
-//				BestIdx = NextIdx;
-//				BestCost = IntegrationFields[NextIdx].IntegratedCost;
-//				BestDir = NextDir;
-//
-//			}
-//		}
-//	};
-//
-//	while (Sources.empty() == false)
-//	{
-//		const int CurIdx = Sources.front();
-//		Sources.pop();
-//		check(IsValidIdx(GRIDSIZE, CurIdx)); // TODO optimize: executed twice for each Idx
-//
-//		if (FlowFields[CurIdx].Dir !=Dirs::EDirection::Unset || IntegrationFields[CurIdx].IntegratedCost == 0) // Reached other solution or goal
-//		{
-//			continue;
-//		}
-//
-//		float BestCost = IntegrationFields[CurIdx].IntegratedCost;
-//		EDirection BestDir =Dirs::EDirection::Unset;
-//		int BestIdx = CurIdx;
-//		const int NorthIdx = CurIdx + GRIDSIZE.X; // TODO optimize
-//		const int EastIdx = CurIdx + 1;
-//		const int SouthIdx = CurIdx - GRIDSIZE.X;
-//		const int WestIdx = CurIdx - 1;
-//
-//		UpdateIfBetter(NorthIdx,Dirs::EDirection::North, OUT BestIdx, OUT BestCost, OUT BestDir);
-//		UpdateIfBetter(EastIdx,Dirs::EDirection::East, OUT BestIdx, OUT BestCost, OUT BestDir);
-//		UpdateIfBetter(SouthIdx,Dirs::EDirection::South, OUT BestIdx, OUT BestCost, OUT BestDir);
-//		UpdateIfBetter(WestIdx,Dirs::EDirection::West, OUT BestIdx, OUT BestCost, OUT BestDir);
-//
-//		FlowFields[CurIdx].Dir = BestDir;
-//		Sources.push(BestIdx);
-//		// TODO diagonal
-//	}
-//
-//}
 
 void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields)
 {
@@ -375,7 +335,7 @@ void DoFlowTiles(UWorld* World)
 	// remove after runLos() is implemented
 	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].IntegratedCost = 0;
 
-	Eikonal::propagateWave(CostFields, IntegrationFields, WaveFront);
+	Eikonal::PropagateWave(CostFields, IntegrationFields, WaveFront);
 
 	DebugDraw(World, IntegrationFields);
 

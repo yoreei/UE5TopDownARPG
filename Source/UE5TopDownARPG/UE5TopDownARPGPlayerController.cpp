@@ -257,91 +257,66 @@ namespace Eikonal {
 		return Result;
 	};
 
+	void ProcessSideCell(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, const FIntVector2& Cell, const FIntVector2& SideCell, TArray<IntegrationField>& IntegrationFields)
+	{
+		// Log the found LOS border
+		UE_LOG(LogUE5TopDownARPG, Log, TEXT("Found LOS Border at: [%d, %d]"), SideCell.X, SideCell.Y);
+
+		FVector2D WorldGoal = ToVector2D(Goal * CELL_SIZE) + H_CELL_SIZE;
+		FVector2D WorldCell = ToVector2D(Cell * CELL_SIZE) + H_CELL_SIZE;
+		FVector2D WorldSideCell = ToVector2D(SideCell * CELL_SIZE) + H_CELL_SIZE;
+		FVector2D Midpoint = (WorldCell + WorldSideCell) / 2.f;
+		FVector2D Direction = Midpoint - WorldGoal;
+
+		Debug::DrawLOS(Direction, Midpoint);
+		//BresenhamsRay2D(CostFields, Direction, Midpoint, IntegrationFields);
+	}
+
 	/*
 	Cell & Goal: Grid Coordinates
 	*/
 	void CalcLOSBorder(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, const FIntVector2& Cell, const FIntVector2& Goal)
 	{
-		FIntVector2 Side;
 		FVector2D GoalToCell = ToVector2D(Cell - Goal);
-		if (GoalToCell.X * GoalToCell.Y > 0) // Wall is in 1st or 3rd quadrant with Goal as origin
+		bool isDiagonalOrientation = GoalToCell.X * GoalToCell.Y > 0;
+
+		if (isDiagonalOrientation)
 		{
-			Side = Cell + Dirs::NW;
-			if (IsInGrid(CostFields, Side)
-				&& IsWall(CostFields, Side) == false
-				&& IsWall(CostFields, Cell + Dirs::W) == false
-				&& IsWall(CostFields, Cell + Dirs::N) == false
-				)
+			FIntVector2 sideNW = Cell + Dirs::NW;
+			if (IsInGrid(CostFields, sideNW)
+				&& !IsWall(CostFields, sideNW)
+				&& !IsWall(CostFields, Cell + Dirs::W)
+				&& !IsWall(CostFields, Cell + Dirs::N))
 			{
-				UE_LOG(LogUE5TopDownARPG, Log, TEXT("Found LOS Border at: [%d, %d]"), Side.X, Side.Y);
-
-				FVector2D WorldGoal = ToVector2D(Goal * CELL_SIZE) + H_CELL_SIZE; // Center of Cell in World coordinates
-				FVector2D WorldCell = ToVector2D(Cell * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldSide = ToVector2D(Side * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldMid = (WorldCell + WorldSide) / 2.f;
-				FVector2D NormDir = WorldMid - WorldGoal;
-
-				Debug::DrawLOS(NormDir, WorldMid);
-				//BresenhamsRay2D(CostFields, NormDir, Midpoint, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideNW, IntegrationFields);
 			}
 
-			Side = Cell + Dirs::SE;
-			if (IsInGrid(CostFields, Side)
-				&& IsWall(CostFields, Side) == false
-				&& IsWall(CostFields, Cell + Dirs::S) == false
-				&& IsWall(CostFields, Cell + Dirs::E) == false
-				)
+			FIntVector2 sideSE = Cell + Dirs::SE;
+			if (IsInGrid(CostFields, sideSE)
+				&& !IsWall(CostFields, sideSE)
+				&& !IsWall(CostFields, Cell + Dirs::S)
+				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				UE_LOG(LogUE5TopDownARPG, Log, TEXT("Found LOS Border at: [%d, %d]"), Side.X, Side.Y);
-
-				FVector2D WorldGoal = ToVector2D(Goal * CELL_SIZE) + H_CELL_SIZE; // Center of Cell in World coordinates
-				FVector2D WorldCell = ToVector2D(Cell * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldSide = ToVector2D(Side * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldMid = (WorldCell + WorldSide) / 2.f;
-				FVector2D NormDir = WorldMid - WorldGoal;
-
-				Debug::DrawLOS(NormDir, WorldMid);
-				//BresenhamsRay2D(CostFields, NormDir, Midpoint, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideSE, IntegrationFields);
 			}
 		}
-		else // Wall is in 2nd or 4th quadrant with Goal as origin
-		{
-			Side = Cell + Dirs::NE;
-			if (IsInGrid(CostFields, Side)
-				&& IsWall(CostFields, Side) == false
-				&& IsWall(CostFields, Cell + Dirs::N) == false
-				&& IsWall(CostFields, Cell + Dirs::E) == false
-				)
+		else {
+			FIntVector2 sideNE = Cell + Dirs::NE;
+			if (IsInGrid(CostFields, sideNE)
+				&& !IsWall(CostFields, sideNE)
+				&& !IsWall(CostFields, Cell + Dirs::N)
+				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				UE_LOG(LogUE5TopDownARPG, Log, TEXT("Found LOS Border at: [%d, %d]"), Side.X, Side.Y);
-
-				FVector2D WorldGoal = ToVector2D(Goal * CELL_SIZE) + H_CELL_SIZE; // Center of Cell in World coordinates
-				FVector2D WorldCell = ToVector2D(Cell * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldSide = ToVector2D(Side * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldMid = (WorldCell + WorldSide) / 2.f;
-				FVector2D NormDir = WorldMid - WorldGoal;
-
-				Debug::DrawLOS(NormDir, WorldMid);
-				//BresenhamsRay2D(CostFields, NormDir, Midpoint, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideNE, IntegrationFields);
 			}
 
-			Side = Cell + Dirs::SW;
-			if (IsInGrid(CostFields, Side)
-				&& IsWall(CostFields, Side) == false
-				&& IsWall(CostFields, Cell + Dirs::S) == false
-				&& IsWall(CostFields, Cell + Dirs::W) == false
-				)
+			FIntVector2 sideSW = Cell + Dirs::SW;
+			if (IsInGrid(CostFields, sideSW)
+				&& !IsWall(CostFields, sideSW)
+				&& !IsWall(CostFields, Cell + Dirs::S)
+				&& !IsWall(CostFields, Cell + Dirs::W))
 			{
-				UE_LOG(LogUE5TopDownARPG, Log, TEXT("Found LOS Border at: [%d, %d]"), Side.X, Side.Y);
-
-				FVector2D WorldGoal = ToVector2D(Goal * CELL_SIZE) + H_CELL_SIZE; // Center of Cell in World coordinates
-				FVector2D WorldCell = ToVector2D(Cell * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldSide = ToVector2D(Side * CELL_SIZE) + H_CELL_SIZE;
-				FVector2D WorldMid = (WorldCell + WorldSide) / 2.f;
-				FVector2D NormDir = WorldMid - WorldGoal;
-
-				Debug::DrawLOS(NormDir, WorldMid);
-				//BresenhamsRay2D(CostFields, NormDir, Midpoint, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideSW, IntegrationFields);
 			}
 		}
 	}
@@ -382,12 +357,12 @@ namespace Eikonal {
 /*
 Direction is normalized
 */
-void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& Direction, const FIntVector2& Pos, TArray<IntegrationField>& IntegrationFields)
-{   // TODO Test
-	int x = Pos.X;
-	int y = Pos.Y;
-	int endX = std::floor(Pos.X + Direction.X * GRIDSIZE.X);
-	int endY = std::floor(Pos.Y + Direction.Y * GRIDSIZE.Y);
+void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& NormDir, const FVector2D& Origin, TArray<IntegrationField>& IntegrationFields)
+{
+	int x = Origin.X;
+	int y = Origin.Y;
+	int endX = std::floor(Origin.X + NormDir.X * GRIDSIZE.X);
+	int endY = std::floor(Origin.Y + NormDir.Y * GRIDSIZE.Y);
 
 	int dx = std::abs(endX - x);
 	int dy = -std::abs(endY - y);

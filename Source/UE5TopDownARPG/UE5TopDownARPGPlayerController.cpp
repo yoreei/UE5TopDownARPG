@@ -19,6 +19,7 @@
 #include <map>
 #include <queue>
 #include <climits>
+#include <cmath>
 
 const float SQRT_OF_2 = FMath::Sqrt(2.f);
 const float CELL_SIZE = 100.f;
@@ -26,6 +27,8 @@ const float H_CELL_SIZE = CELL_SIZE / 2;
 const float Q_CELL_SIZE = CELL_SIZE / 4;
 const float CELL_DIAG = CELL_SIZE * SQRT_OF_2;
 const float H_CELL_DIAG = CELL_SIZE * SQRT_OF_2;
+
+const float bDRAW_COSTS = false;
 
 const FVector COST_TRACE_Y_START = { 0.f, 0.f, 250.f };
 const FVector COST_TRACE_DIRECTION {0.f, 0.f, -100};
@@ -86,12 +89,30 @@ struct IntegrationField {
 	uint8_t LOS : 1;
 };
 
+bool IsInGrid(const TArray<uint8_t>& CostFields, const FIntVector2& Cell) { // TODO can we reuse?
+	return Cell.X >= 0 && Cell.X < GRIDSIZE.X && Cell.Y >= 0 && Cell.Y < GRIDSIZE.Y;
+}
+
+bool IsWall(const TArray<uint8_t>& CostFields, const FIntVector2& Cell)
+{
+	return CostFields[Cell.Y * GRIDSIZE.X + Cell.X] == UINT8_MAX;
+}
+
+FVector2D ToVector2D(const FIntVector2& IntVector2)
+{
+	FVector2D Result;
+	Result.X = static_cast<float>(IntVector2.X);
+	Result.Y = static_cast<float>(IntVector2.Y);
+	return Result;
+};
+
 namespace Debug
 {
 	UWorld* pWorld;
-	void Draw(UWorld* World, const TArray<uint8_t>& CostFields)
+	void DrawCosts(const TArray<uint8_t>& CostFields)
 	{
-		ensure(World);
+		if (!bDRAW_COSTS) { return;  }
+		ensure(pWorld);
 		for (int y = 0; y < GRIDSIZE.Y; ++y)
 		{
 			for (int x = 0; x < GRIDSIZE.X; ++x)
@@ -99,7 +120,7 @@ namespace Debug
 				FVector RayStart = COST_TRACE_Y_START + FVector(x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2, 0.f);
 				FVector RayEnd = RayStart + COST_TRACE_DIRECTION;
 				// UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GRIDSIZE.X + j]);
-				DrawDebugDirectionalArrow(World, RayStart, RayEnd, 3.0f, CostFields[y * GRIDSIZE.X + x] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
+				DrawDebugDirectionalArrow(pWorld, RayStart, RayEnd, 3.0f, CostFields[y * GRIDSIZE.X + x] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
 			}
 		}
 	}
@@ -177,9 +198,9 @@ namespace Debug
 	/*
 	Origin in World Coordinates
 	*/
-	void DrawLOS(FVector2D NormDirection, FVector2D Origin = {0.f,0.f}, int Scale = 1000000)
+	void DrawLOS(FVector2D NormDir, FVector2D Origin = {0.f,0.f}, int Scale = 1000000)
 	{
-		FVector2D Direction = NormDirection * Scale;
+		FVector2D Direction = NormDir * Scale;
 		FVector2D End = Direction + Origin;
 
 		FVector Origin3D = addZ(Origin, 60.f);
@@ -188,7 +209,7 @@ namespace Debug
 		UE_LOG(LogUE5TopDownARPG, Log, TEXT("Draw LOS: Origin3D = %s; End3D = %s"), *Origin3D.ToString(), *End3D.ToString());
 	}
 
-	void DrawBox(FIntVector2 At)
+	void DrawBox(FIntVector2 At, FColor Color = FColor::Orange)
 	{
 		ensure(pWorld);
 		FVector Center{
@@ -197,8 +218,18 @@ namespace Debug
 			60.f
 		};
 		FVector Extent = FVector(Q_CELL_SIZE, Q_CELL_SIZE, Q_CELL_SIZE);
-		DrawDebugBox(pWorld, Center, Extent, FColor::Orange, true);
+		DrawDebugBox(pWorld, Center, Extent, Color, true);
 		UE_LOG(LogUE5TopDownARPG, Log, TEXT("Draw Box: Center = %s; Extent = %s"), *Center.ToString(), *Extent.ToString());
+	}
+
+	void DrawBox(int At, FColor Color = FColor::Orange)
+	{
+		DrawBox(
+			FIntVector2(
+				At % GRIDSIZE.X,
+				At / GRIDSIZE.X
+			),
+			Color);
 	}
 
 	void DrawCoords()
@@ -223,17 +254,43 @@ namespace Debug
 
 }
 
+/*
+Direction is normalized
+*/
+void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& NormDir, const FVector2D& Origin, TArray<IntegrationField>& IntegrationFields) {
+	// Convert Origin from World to Grid coordinates
+	FIntVector2 gridOrigin = FIntVector2(FMath::RoundToInt(Origin.X / CELL_SIZE), FMath::RoundToInt(Origin.Y / CELL_SIZE));
+
+	// Calculate end point - large enough to ensure it goes "off-grid"
+	FIntVector2 gridEnd = FIntVector2(gridOrigin.X + NormDir.X * 1000, gridOrigin.Y + NormDir.Y * 1000);
+
+	// Bresenham's Algorithm in 2D
+	int dx = FMath::Abs(gridEnd.X - gridOrigin.X), sx = gridOrigin.X < gridEnd.X ? 1 : -1;
+	int dy = -FMath::Abs(gridEnd.Y - gridOrigin.Y), sy = gridOrigin.Y < gridEnd.Y ? 1 : -1;
+	int err = dx + dy, e2;
+
+	for (;;) {
+		// Mark the current cell as blocked
+		int index = gridOrigin.Y * GRIDSIZE.X + gridOrigin.X; // Assuming GRIDSIZE is known
+		if (index >= 0 && index < IntegrationFields.Num()) {
+			IntegrationFields[index].WaveFrontBlocked = true;
+			Debug::DrawBox(index, FColor::Cyan);
+		}
+
+		// Check for wall
+		if (IsWall(CostFields, gridOrigin)) {
+			break;
+		}
+
+		if (gridOrigin.X == gridEnd.X && gridOrigin.Y == gridEnd.Y) break;
+		e2 = 2 * err;
+		if (e2 >= dy) { err += dy; gridOrigin.X += sx; }
+		if (e2 <= dx) { err += dx; gridOrigin.Y += sy; }
+	}
+}
+
 namespace Eikonal {
 	const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
-
-	bool IsInGrid(const TArray<uint8_t>& CostFields, const FIntVector2& Cell) { // TODO can we reuse?
-		return Cell.X >= 0 && Cell.X < GRIDSIZE.X && Cell.Y >= 0 && Cell.Y < GRIDSIZE.Y;
-	}
-
-	bool IsWall(const TArray<uint8_t>& CostFields, const FIntVector2& Cell)
-	{
-		return CostFields[Cell.Y * GRIDSIZE.X + Cell.X] == UINT8_MAX;
-	}
 
 	using VisitCellFunc = const std::function<void(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal)>&;
 
@@ -249,14 +306,6 @@ namespace Eikonal {
 		}
 	}
 
-	FVector2D ToVector2D(const FIntVector2& IntVector2)
-	{
-		FVector2D Result;
-		Result.X = static_cast<float>(IntVector2.X);
-		Result.Y = static_cast<float>(IntVector2.Y);
-		return Result;
-	};
-
 	void ProcessSideCell(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, const FIntVector2& Cell, const FIntVector2& SideCell, TArray<IntegrationField>& IntegrationFields)
 	{
 		// Log the found LOS border
@@ -267,9 +316,11 @@ namespace Eikonal {
 		FVector2D WorldSideCell = ToVector2D(SideCell * CELL_SIZE) + H_CELL_SIZE;
 		FVector2D Midpoint = (WorldCell + WorldSideCell) / 2.f;
 		FVector2D Direction = Midpoint - WorldGoal;
+		check(Direction.Normalize(0.f));
+		FVector2D NudgeMid = Midpoint + Direction * 100;
 
-		Debug::DrawLOS(Direction, Midpoint);
-		//BresenhamsRay2D(CostFields, Direction, Midpoint, IntegrationFields);
+		Debug::DrawLOS(Direction, NudgeMid);
+		BresenhamsRay2D(CostFields, Direction, NudgeMid, IntegrationFields);
 	}
 
 	/*
@@ -354,44 +405,6 @@ namespace Eikonal {
 	}
 }
 
-/*
-Direction is normalized
-*/
-void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& NormDir, const FVector2D& Origin, TArray<IntegrationField>& IntegrationFields)
-{
-	int x = Origin.X;
-	int y = Origin.Y;
-	int endX = std::floor(Origin.X + NormDir.X * GRIDSIZE.X);
-	int endY = std::floor(Origin.Y + NormDir.Y * GRIDSIZE.Y);
-
-	int dx = std::abs(endX - x);
-	int dy = -std::abs(endY - y);
-	int sx = x < endX ? 1 : -1;
-	int sy = y < endY ? 1 : -1;
-	int err = dx + dy, e2;
-
-	while (true) {
-		if (x >= 0 && x < GRIDSIZE.X && y >= 0 && y < GRIDSIZE.Y) {
-			if (CostFields[y * GRIDSIZE.X + x] == 255) {
-				IntegrationFields[y * GRIDSIZE.X + x].LOS = false;
-				break;
-			}
-			else {
-				IntegrationFields[y * GRIDSIZE.X + x].LOS = true;
-			}
-		}
-		else {
-			// Break if we are out of bounds
-			break;
-		}
-
-		if (x == endX && y == endY) break;
-		e2 = 2 * err;
-		if (e2 >= dy) { err += dy; x += sx; }
-		if (e2 <= dx) { err += dx; y += sy; }
-	}
-}
-
 void LineOfSightPass(int MapHeight, int MapWidth, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields)
 {
 	// TODO Implement
@@ -449,7 +462,7 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 	}
 }
 
-bool CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields)
+void CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields)
 {
 	ensure(World);
 
@@ -467,7 +480,7 @@ bool CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields)
 			CostFields[y * GRIDSIZE.X + x] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}
 	}
-	return true;
+	Debug::DrawCosts(CostFields);
 }
 
 void DoFlowTiles(UWorld* World)
@@ -477,8 +490,6 @@ void DoFlowTiles(UWorld* World)
 	TArray<uint8_t> CostFields;
 	CostFields.Init(1, GRIDSIZE.X * GRIDSIZE.Y);
 	CalculateCostFields(World, CostFields);
-
-	Debug::Draw(World, CostFields);
 
 	Debug::DrawCoords();
 

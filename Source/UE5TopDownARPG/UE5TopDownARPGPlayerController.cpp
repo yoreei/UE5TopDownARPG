@@ -27,8 +27,10 @@ const float H_CELL_SIZE = CELL_SIZE / 2;
 const float Q_CELL_SIZE = CELL_SIZE / 4;
 const float CELL_DIAG = CELL_SIZE * SQRT_OF_2;
 const float H_CELL_DIAG = CELL_SIZE * SQRT_OF_2;
+const float PLANE_HEIGHT = 51.f;
 
 const float bDRAW_COSTS = false;
+const float bDRAW_INTEGRATION = true;
 
 const FVector COST_TRACE_Y_START = { 0.f, 0.f, 250.f };
 const FVector COST_TRACE_DIRECTION {0.f, 0.f, -100};
@@ -98,6 +100,14 @@ bool IsWall(const TArray<uint8_t>& CostFields, const FIntVector2& Cell)
 	return CostFields[Cell.Y * GRIDSIZE.X + Cell.X] == UINT8_MAX;
 }
 
+FIntVector2 ToFIntVector2(int LinearIdx)
+{
+	return FIntVector2(
+		LinearIdx % GRIDSIZE.X,
+		LinearIdx / GRIDSIZE.X
+	);
+}
+
 FVector2D ToVector2D(const FIntVector2& IntVector2)
 {
 	FVector2D Result;
@@ -109,6 +119,9 @@ FVector2D ToVector2D(const FIntVector2& IntVector2)
 namespace Debug
 {
 	UWorld* pWorld;
+
+	// TODO DrawDebugCoordinateSystem
+
 	void DrawCosts(const TArray<uint8_t>& CostFields)
 	{
 		if (!bDRAW_COSTS) { return;  }
@@ -125,16 +138,17 @@ namespace Debug
 		}
 	}
 
-	void Draw(UWorld* World, const TArray<IntegrationField>& IntegrationFields)
+	void DrawIntegration(const TArray<IntegrationField>& IntegrationFields)
 	{
-		ensure(World);
-		FlushPersistentDebugLines(World);
+		if (!bDRAW_INTEGRATION) { return; }
+		ensure(pWorld);
+		FlushPersistentDebugLines(pWorld);
 
 		for (int y = 0; y < GRIDSIZE.Y; ++y)
 		{
 			for (int x = 0; x < GRIDSIZE.X; ++x)
 			{
-				FVector TextStart = { x * CELL_SIZE + CELL_SIZE/2.f, y * CELL_SIZE + CELL_SIZE/2.f, 60.f };
+				FVector TextStart = { x * CELL_SIZE + H_CELL_SIZE, y * CELL_SIZE + H_CELL_SIZE , PLANE_HEIGHT }; // Top corner of cell
 				auto IntegratedCost = FString::FromInt(IntegrationFields[y * GRIDSIZE.X + x].IntegratedCost);
 				if (IntegrationFields[y * GRIDSIZE.X + x].IntegratedCost == FLT_MAX)
 				{
@@ -145,8 +159,20 @@ namespace Debug
 
 				FActorSpawnParameters SpawnParameters;
 				SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-				auto TextActor = World->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), TextStart, FRotator(90,0,180), SpawnParameters);
+				auto TextActor = pWorld->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), TextStart, FRotator(90,0,180), SpawnParameters);
 				TextActor->GetTextRender()->SetText(FText::FromString(IntegratedCost));
+				TextActor->GetTextRender()->SetTextRenderColor(FColor::Magenta);
+
+				FVector RayStart = COST_TRACE_Y_START + FVector(x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2, 0.f);
+				FVector RayEnd = RayStart + COST_TRACE_DIRECTION;
+				// UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GRIDSIZE.X + j]);
+				FVector Points[]{
+					{x * CELL_SIZE, y * CELL_SIZE, PLANE_HEIGHT},
+					{x * CELL_SIZE + CELL_SIZE, y * CELL_SIZE + CELL_SIZE , PLANE_HEIGHT}
+				};
+				FBox Box{ Points, 2 };
+				FTransform Transform { FVector(x * CELL_SIZE, y * CELL_SIZE, PLANE_HEIGHT )};
+				DrawDebugSolidBox(pWorld, Box, FColor::White, Transform, true);
 			}
 		}
 	}
@@ -224,12 +250,7 @@ namespace Debug
 
 	void DrawBox(int At, FColor Color = FColor::Orange)
 	{
-		DrawBox(
-			FIntVector2(
-				At % GRIDSIZE.X,
-				At / GRIDSIZE.X
-			),
-			Color);
+		return DrawBox(ToFIntVector2(At), Color);
 	}
 
 	void DrawCoords()
@@ -240,7 +261,7 @@ namespace Debug
 		{
 			for (int x = 0; x < GRIDSIZE.X; ++x)
 			{
-				FVector TextStart = { x * CELL_SIZE + H_CELL_SIZE, y * CELL_SIZE, 100.f }; // TODO why x,y reversed?
+				FVector TextStart = { x * CELL_SIZE + Q_CELL_SIZE, y * CELL_SIZE, PLANE_HEIGHT}; // Bottom part of cell // TODO why x,y reversed?
 					
 				// UE_LOG(LogUE5TopDownARPG, Log, TEXT("IntegrationFields [%d][%d] = [%s]"), i, j, *IntegratedCost
 				FText Coords = FText::FromString(" [" + FString::FromInt(x) + ", " + FString::FromInt(y) + "]");
@@ -248,6 +269,7 @@ namespace Debug
 				SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 				auto TextActor = pWorld->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), TextStart, FRotator(90, 0, 180), SpawnParameters);
 				TextActor->GetTextRender()->SetText(Coords);
+				TextActor->GetTextRender()->SetTextRenderColor(FColor::Turquoise);
 			}
 		}
 	}
@@ -257,7 +279,7 @@ namespace Debug
 /*
 Direction is normalized
 */
-void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& NormDir, const FVector2D& Origin, TArray<IntegrationField>& IntegrationFields) {
+void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& NormDir, const FVector2D& Origin, OUT TArray<IntegrationField>& IntegrationFields, OUT std::queue<FIntVector2>& SecondWaveFront) {
 	// Convert Origin from World to Grid coordinates
 	FIntVector2 gridOrigin = FIntVector2(FMath::RoundToInt(Origin.X / CELL_SIZE), FMath::RoundToInt(Origin.Y / CELL_SIZE));
 
@@ -273,7 +295,9 @@ void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& NormDir
 		// Mark the current cell as blocked
 		int index = gridOrigin.Y * GRIDSIZE.X + gridOrigin.X; // Assuming GRIDSIZE is known
 		if (index >= 0 && index < IntegrationFields.Num()) {
-			IntegrationFields[index].WaveFrontBlocked = true;
+			IntegrationFields[index].WaveFrontBlocked = true; // TODO do we need?
+			IntegrationFields[index].LOS = false;
+			SecondWaveFront.push(ToFIntVector2(index));
 			Debug::DrawBox(index, FColor::Cyan);
 		}
 
@@ -292,21 +316,9 @@ void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FVector2D& NormDir
 namespace Eikonal {
 	const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
 
-	using VisitCellFunc = const std::function<void(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal)>&;
+	using VisitCellFunc = const std::function<void(const TArray<uint8_t>& CostFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& SecondWaveFront)>&;
 
-	void VisitCell_Finish(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal) {
-		if (IsInGrid(CostFields, Cell) == false || IsWall(CostFields, Cell)) { return; }
-
-		float NewCost = CurrentCost + CostFields[Cell.Y * GRIDSIZE.X + Cell.X];
-		float OldCost = IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].IntegratedCost;
-
-		if (NewCost < OldCost * SIGNIFICANT_COST_REDUCTION) {
-			IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].IntegratedCost = NewCost;
-			WaveFront.push(Cell);
-		}
-	}
-
-	void ProcessSideCell(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, const FIntVector2& Cell, const FIntVector2& SideCell, TArray<IntegrationField>& IntegrationFields)
+	void ProcessSideCell(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, const FIntVector2& Cell, const FIntVector2& SideCell, OUT TArray<IntegrationField>& IntegrationFields, OUT std::queue<FIntVector2>& SecondWaveFront)
 	{
 		// Log the found LOS border
 		UE_LOG(LogUE5TopDownARPG, Log, TEXT("Found LOS Border at: [%d, %d]"), SideCell.X, SideCell.Y);
@@ -320,13 +332,13 @@ namespace Eikonal {
 		FVector2D NudgeMid = Midpoint + Direction * 100;
 
 		Debug::DrawLOS(Direction, NudgeMid);
-		BresenhamsRay2D(CostFields, Direction, NudgeMid, IntegrationFields);
+		BresenhamsRay2D(CostFields, Direction, NudgeMid, OUT IntegrationFields, OUT SecondWaveFront);
 	}
 
 	/*
 	Cell & Goal: Grid Coordinates
 	*/
-	void CalcLOSBorder(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, const FIntVector2& Cell, const FIntVector2& Goal)
+	void CalcLOSBorder(const TArray<uint8_t>& CostFields, const FIntVector2& Cell, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields, OUT std::queue<FIntVector2>& SecondWaveFront)
 	{
 		FVector2D GoalToCell = ToVector2D(Cell - Goal);
 		bool isDiagonalOrientation = GoalToCell.X * GoalToCell.Y > 0;
@@ -339,7 +351,7 @@ namespace Eikonal {
 				&& !IsWall(CostFields, Cell + Dirs::W)
 				&& !IsWall(CostFields, Cell + Dirs::N))
 			{
-				ProcessSideCell(CostFields, Goal, Cell, sideNW, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideNW, OUT IntegrationFields, OUT SecondWaveFront);
 			}
 
 			FIntVector2 sideSE = Cell + Dirs::SE;
@@ -348,7 +360,7 @@ namespace Eikonal {
 				&& !IsWall(CostFields, Cell + Dirs::S)
 				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				ProcessSideCell(CostFields, Goal, Cell, sideSE, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideSE, OUT IntegrationFields, OUT SecondWaveFront);
 			}
 		}
 		else {
@@ -358,7 +370,7 @@ namespace Eikonal {
 				&& !IsWall(CostFields, Cell + Dirs::N)
 				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				ProcessSideCell(CostFields, Goal, Cell, sideNE, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideNE, OUT IntegrationFields, OUT SecondWaveFront);
 			}
 
 			FIntVector2 sideSW = Cell + Dirs::SW;
@@ -367,18 +379,18 @@ namespace Eikonal {
 				&& !IsWall(CostFields, Cell + Dirs::S)
 				&& !IsWall(CostFields, Cell + Dirs::W))
 			{
-				ProcessSideCell(CostFields, Goal, Cell, sideSW, IntegrationFields);
+				ProcessSideCell(CostFields, Goal, Cell, sideSW, OUT IntegrationFields, OUT SecondWaveFront);
 			}
 		}
 	}
 
-	void VisitCell_LOS(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal) {
+	void VisitCell_LOS(const TArray<uint8_t>& CostFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields, OUT std::queue<FIntVector2>& SecondWaveFront) {
 		if (IsInGrid(CostFields, Cell) == false || IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].WaveFrontBlocked) { return; }
 
 		if (IsWall(CostFields, Cell))
 		{
 			UE_LOG(LogUE5TopDownARPG, Log, TEXT("Found Wall at: [%d, %d]"), Cell.X, Cell.Y);
-			CalcLOSBorder(CostFields, IntegrationFields, Cell, Goal);
+			CalcLOSBorder(CostFields, Cell, Goal, OUT IntegrationFields, OUT SecondWaveFront);
 		}
 		float NewCost = CurrentCost + CostFields[Cell.Y * GRIDSIZE.X + Cell.X];
 		float OldCost = IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].IntegratedCost;
@@ -389,7 +401,20 @@ namespace Eikonal {
 		}
 	}
 
-	void PropagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, VisitCellFunc VisitCell, const FIntVector2& Goal) {
+	void VisitCell_Finish(const TArray<uint8_t>& CostFields, std::queue<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields, OUT std::queue<FIntVector2>& SecondWaveFront) {
+		if (IsInGrid(CostFields, Cell) == false || IsWall(CostFields, Cell)) { return; }
+
+		float NewCost = CurrentCost + CostFields[Cell.Y * GRIDSIZE.X + Cell.X];
+		float OldCost = IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].IntegratedCost;
+
+		if (NewCost < OldCost * SIGNIFICANT_COST_REDUCTION) {
+			IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].IntegratedCost = NewCost;
+			WaveFront.push(Cell);
+		}
+	}
+
+	void PropagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::queue<FIntVector2>& WaveFront, VisitCellFunc VisitCell, const FIntVector2& Goal, OUT std::queue<FIntVector2>& SecondWaveFront)
+	{
 
 		while (!WaveFront.empty()) {
 			FIntVector2 Current = WaveFront.front();
@@ -397,11 +422,12 @@ namespace Eikonal {
 
 			float CurrentCost = IntegrationFields[Current.Y * GRIDSIZE.X + Current.X].IntegratedCost;
 
-			VisitCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X + 1, Current.Y), CurrentCost, Goal);
-			VisitCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X - 1, Current.Y), CurrentCost, Goal);
-			VisitCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X, Current.Y + 1), CurrentCost, Goal);
-			VisitCell(CostFields, IntegrationFields, WaveFront, FIntVector2(Current.X, Current.Y - 1), CurrentCost, Goal);
+			VisitCell(CostFields, WaveFront, FIntVector2(Current.X + 1, Current.Y), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront);
+			VisitCell(CostFields, WaveFront, FIntVector2(Current.X - 1, Current.Y), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront);
+			VisitCell(CostFields, WaveFront, FIntVector2(Current.X, Current.Y + 1), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront);
+			VisitCell(CostFields, WaveFront, FIntVector2(Current.X, Current.Y - 1), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront);
 		}
+		Debug::DrawIntegration(IntegrationFields);
 	}
 }
 
@@ -508,15 +534,16 @@ void DoFlowTiles(UWorld* World)
 	Debug::DrawBox(Goal);
 	std::queue<FIntVector2> WaveFront;
 	WaveFront.push(Goal);
+	std::queue<FIntVector2> SecondWaveFront;
+	std::queue<FIntVector2> DummyWaveFront; // TODO refactor
 	TArray<IntegrationField> IntegrationFields;
 	IntegrationFields.Init({ FLT_MAX, 0, 0 }, GRIDSIZE.X * GRIDSIZE.Y);
 	// runLos()
 	// remove after runLos() is implemented
 	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].IntegratedCost = 0;
 
-	Eikonal::PropagateWave(CostFields, IntegrationFields, WaveFront, Eikonal::VisitCell_LOS, Goal);
-
-	//Debug::Draw(World, IntegrationFields);
+	Eikonal::PropagateWave(CostFields, IntegrationFields, WaveFront, Eikonal::VisitCell_LOS, Goal, SecondWaveFront);
+	Eikonal::PropagateWave(CostFields, IntegrationFields, SecondWaveFront, Eikonal::VisitCell_Finish, Goal, DummyWaveFront);
 
 	//TArray<FlowField> FlowFields;
 	//FlowFields.Init({Dirs::EDirection(), false, 0}, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?

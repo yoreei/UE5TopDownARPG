@@ -321,47 +321,30 @@ namespace Eikonal {
 	const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
 
 	/*
-Direction is normalized
+Ray starts from Origin and extends in opposite direction of Goal
 */
-	void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, const FIntVector2& Cell, const FIntVector2& SideCell, OUT std::deque<FIntVector2>& LOS)
+	void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, FIntVector2 Origin, OUT std::deque<FIntVector2>& LOS)
 	{
-		FVector2D Direction;
-		FVector2D Midpoint;
-		{
-			FVector2D WorldGoal = ToVector2D(Goal * CELL_SIZE) + H_CELL_SIZE;
-			FVector2D WorldCell = ToVector2D(Cell * CELL_SIZE) + H_CELL_SIZE;
-			FVector2D WorldSideCell = ToVector2D(SideCell * CELL_SIZE) + H_CELL_SIZE;
-			Midpoint = (WorldCell + WorldSideCell) / 2.f;
-			Direction = Midpoint - WorldGoal;
-			check(Direction.Normalize(0.f));
-			Midpoint = Midpoint + Direction * 100; // A little nudge
-		}
-
-		// Convert Origin from World to Grid coordinates
-		FIntVector2 gridOrigin = FIntVector2(FMath::RoundToInt(Midpoint.X / CELL_SIZE), FMath::RoundToInt(Midpoint.Y / CELL_SIZE));
-
 		// Calculate end point - large enough to ensure it goes "off-grid"
-		FIntVector2 gridEnd = FIntVector2(gridOrigin.X + Direction.X * 1000, gridOrigin.Y + Direction.Y * 1000);
+		FIntVector2 Direction = (Origin - Goal) * 1000;
 
 		// Bresenham's Algorithm in 2D
-		int dx = FMath::Abs(gridEnd.X - gridOrigin.X), sx = gridOrigin.X < gridEnd.X ? 1 : -1;
-		int dy = -FMath::Abs(gridEnd.Y - gridOrigin.Y), sy = gridOrigin.Y < gridEnd.Y ? 1 : -1;
+		int dx = FMath::Abs(Direction.X - Origin.X), sx = Origin.X < Direction.X ? 1 : -1;
+		int dy = -FMath::Abs(Direction.Y - Origin.Y), sy = Origin.Y < Direction.Y ? 1 : -1;
 		int err = dx + dy, e2;
 
-		while (IsWall(CostFields, gridOrigin) == false) {
+		while (IsWall(CostFields, Origin) == false) {
 			// Mark the current cell as blocked
-			if (IsInGrid(gridOrigin))
+			if (IsInGrid(Origin))
 			{	
-				LOS.push_back(gridOrigin);
+				LOS.push_back(Origin);
 			}
 
-			if (gridOrigin.X == gridEnd.X && gridOrigin.Y == gridEnd.Y) break;
+			if (Origin.X == Direction.X && Origin.Y == Direction.Y) break;
 			e2 = 2 * err;
-			if (e2 >= dy) { err += dy; gridOrigin.X += sx; }
-			if (e2 <= dx) { err += dx; gridOrigin.Y += sy; }
+			if (e2 >= dy) { err += dy; Origin.X += sx; }
+			if (e2 <= dx) { err += dx; Origin.Y += sy; }
 		}
-
-		Debug::DrawLOS(Direction, Midpoint);
 	}
 
 	/*
@@ -380,7 +363,7 @@ Direction is normalized
 				&& !IsWall(CostFields, Cell + Dirs::W)
 				&& !IsWall(CostFields, Cell + Dirs::N))
 			{
-				BresenhamsRay2D(CostFields, Goal, Cell, sideNW, OUT Los);
+				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::W, OUT Los);
 			}
 
 			FIntVector2 sideSE = Cell + Dirs::SE;
@@ -389,7 +372,7 @@ Direction is normalized
 				&& !IsWall(CostFields, Cell + Dirs::S)
 				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				BresenhamsRay2D(CostFields, Goal, Cell, sideSE, OUT Los);
+				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::E : Cell + Dirs::S, OUT Los);
 			}
 		}
 		else {
@@ -399,7 +382,7 @@ Direction is normalized
 				&& !IsWall(CostFields, Cell + Dirs::N)
 				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				BresenhamsRay2D(CostFields, Goal, Cell, sideNE, OUT Los);
+				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::E, OUT Los);
 			}
 
 			FIntVector2 sideSW = Cell + Dirs::SW;
@@ -408,7 +391,7 @@ Direction is normalized
 				&& !IsWall(CostFields, Cell + Dirs::S)
 				&& !IsWall(CostFields, Cell + Dirs::W))
 			{
-				BresenhamsRay2D(CostFields, Goal, Cell, sideSW, OUT Los);
+				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::W : Cell + Dirs::S, OUT Los);
 			}
 		}
 	}
@@ -420,6 +403,7 @@ Direction is normalized
 		{
 			return;
 		}
+		//if (Cell.X == 22 && Cell.Y == 25) { __debugbreak(); }
 
 		if (!bLosPass && IsWall(CostFields, Cell)) // used to be !bLosPass &&
 		{
@@ -438,6 +422,8 @@ Direction is normalized
 				Debug::DrawBox(LosCellIdx, FColor::Cyan);
 			}
 			SecondWaveFront.insert(SecondWaveFront.end(), Los.begin(), Los.end());
+
+			return;
 		}
 
 		int Idx = ToLinearIdx(Cell);
@@ -451,6 +437,7 @@ Direction is normalized
 				WaveFront.push_back(Cell); // calculate WaveFrontBlocked but don't propagate
 				IntegrationFields[Idx].LOS = bLosPass; // WaveFrontBlocked will have LOS = true
 				UE_LOG(LogUE5TopDownARPG, Log, TEXT("VisitCell: Pushing [%d, %d]"), Cell.X, Cell.Y);
+				//if (Cell.X == 22 && Cell.Y == 25) { __debugbreak(); }
 			}
 
 		}
@@ -462,7 +449,13 @@ Direction is normalized
 		while (!WaveFront.empty()) {
 			FIntVector2 Current = WaveFront.front();
 			WaveFront.pop_front();
-			if (Current.X == 23 && Current.Y == 23) { __debugbreak(); }
+			//if (Current.X == 23 && Current.Y == 23) { __debugbreak(); }
+			//if (Current.X == 23 && Current.Y == 24) { __debugbreak(); }
+			//if (Current.X == 22 && Current.Y == 22) { __debugbreak(); }
+			//if (Current.X == 22 && Current.Y == 25) { __debugbreak(); }
+			//if (Current.X == 21 && Current.Y == 25) { __debugbreak(); }
+			//if (Current.X == 20 && Current.Y == 25) { __debugbreak(); }
+			//if (Current.X == 19 && Current.Y == 25) { __debugbreak(); }
 
 			float CurrentCost = IntegrationFields[Current.Y * GRIDSIZE.X + Current.X].IntegratedCost;
 

@@ -82,7 +82,7 @@ static const int ApplyDir(const int Idx, const FIntVector2& Dir) {
 struct FlowField {
 	Dirs::EDirection Dir : 4;
 	uint8_t Completed : 1; // TODO Change this to Pathable in next version
-	uint8_t LOS : 1;       // NOT USED YET
+	uint8_t LOS : 1;
 };
 
 struct IntegrationField {
@@ -141,6 +141,7 @@ namespace Debug
 
 	const float LOS_FLAG_HEIGHT = PLANE_HEIGHT + 1.f;
 	const float TEXT_HEIGHT = PLANE_HEIGHT + 2.f;
+	const float FLOW_ARROW_HEIGHT = PLANE_HEIGHT + 50.f;
 	UWorld* pWorld;
 
 	void DrawCosts(const TArray<uint8_t>& CostFields)
@@ -220,8 +221,7 @@ namespace Debug
 	void Draw(UWorld* World, const TArray<FlowField>& FlowFields)
 	{
 		ensure(World);
-		FlushPersistentDebugLines(World);
-		FVector Ray{ 0.f, 0.f, 50.f };
+		FVector Ray{ 0.f, 0.f, FLOW_ARROW_HEIGHT };
 
 		for (int y = 0; y < GRIDSIZE.Y; ++y)
 		{
@@ -247,7 +247,7 @@ namespace Debug
 					FVector Start = Ray - Offset;
 					FVector End = Ray + Offset;
 
-					DrawDebugDirectionalArrow(World, Start, End, 3.f, FColor::Green, true, 9999999.f, 0, 2.f);
+					DrawDebugDirectionalArrow(World, Start, End, 3.f, FColor::Green, true, 9999999.f, 0, Q_CELL_SIZE / 2.f);
 
 					//UE_LOG(LogUE5TopDownARPG, Log, TEXT("FlowFields[%d][%d].Dir = [%d]"), y, x, (int)FlowFields[y * GRIDSIZE.X + x].Dir);
 					//UE_LOG(LogUE5TopDownARPG, Log, TEXT("Start = %s"), *Start.ToString());
@@ -363,7 +363,7 @@ Ray starts from Origin and extends in opposite direction of Goal
 				&& !IsWall(CostFields, Cell + Dirs::W)
 				&& !IsWall(CostFields, Cell + Dirs::N))
 			{
-				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::W, OUT Los);
+				BresenhamsRay2D(CostFields, Goal + Dirs::S, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::W, OUT Los);
 			}
 
 			FIntVector2 sideSE = Cell + Dirs::SE;
@@ -372,7 +372,7 @@ Ray starts from Origin and extends in opposite direction of Goal
 				&& !IsWall(CostFields, Cell + Dirs::S)
 				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::E : Cell + Dirs::S, OUT Los);
+				BresenhamsRay2D(CostFields, Goal + Dirs::N, GoalToCell.Y > 0 ? Cell + Dirs::E : Cell + Dirs::S, OUT Los);
 			}
 		}
 		else {
@@ -382,7 +382,7 @@ Ray starts from Origin and extends in opposite direction of Goal
 				&& !IsWall(CostFields, Cell + Dirs::N)
 				&& !IsWall(CostFields, Cell + Dirs::E))
 			{
-				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::E, OUT Los);
+				BresenhamsRay2D(CostFields, Goal + Dirs::S, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::E, OUT Los);
 			}
 
 			FIntVector2 sideSW = Cell + Dirs::SW;
@@ -391,7 +391,7 @@ Ray starts from Origin and extends in opposite direction of Goal
 				&& !IsWall(CostFields, Cell + Dirs::S)
 				&& !IsWall(CostFields, Cell + Dirs::W))
 			{
-				BresenhamsRay2D(CostFields, Goal, GoalToCell.Y > 0 ? Cell + Dirs::W : Cell + Dirs::S, OUT Los);
+				BresenhamsRay2D(CostFields, Goal + Dirs::N, GoalToCell.Y > 0 ? Cell + Dirs::W : Cell + Dirs::S, OUT Los);
 			}
 		}
 	}
@@ -418,7 +418,7 @@ Ray starts from Origin and extends in opposite direction of Goal
 			{
 				int LosCellIdx = ToLinearIdx(LosCell);
 				IntegrationFields[LosCellIdx].WaveFrontBlocked = true;
-				IntegrationFields[LosCellIdx].LOS = false; // TODO: this will get overwritten by IntegrationFields[Idx].LOS = bLosPass;
+				IntegrationFields[LosCellIdx].LOS = false; // false is default, but let's make sure
 				Debug::DrawBox(LosCellIdx, FColor::Cyan);
 			}
 			SecondWaveFront.insert(SecondWaveFront.end(), Los.begin(), Los.end());
@@ -435,9 +435,8 @@ Ray starts from Origin and extends in opposite direction of Goal
 			if (IntegrationFields[Idx].WaveFrontBlocked == false)
 			{
 				WaveFront.push_back(Cell); // calculate WaveFrontBlocked but don't propagate
-				IntegrationFields[Idx].LOS = bLosPass; // WaveFrontBlocked will have LOS = true
+				IntegrationFields[Idx].LOS = bLosPass;
 				UE_LOG(LogUE5TopDownARPG, Log, TEXT("VisitCell: Pushing [%d, %d]"), Cell.X, Cell.Y);
-				//if (Cell.X == 22 && Cell.Y == 25) { __debugbreak(); }
 			}
 
 		}
@@ -449,13 +448,6 @@ Ray starts from Origin and extends in opposite direction of Goal
 		while (!WaveFront.empty()) {
 			FIntVector2 Current = WaveFront.front();
 			WaveFront.pop_front();
-			//if (Current.X == 23 && Current.Y == 23) { __debugbreak(); }
-			//if (Current.X == 23 && Current.Y == 24) { __debugbreak(); }
-			//if (Current.X == 22 && Current.Y == 22) { __debugbreak(); }
-			//if (Current.X == 22 && Current.Y == 25) { __debugbreak(); }
-			//if (Current.X == 21 && Current.Y == 25) { __debugbreak(); }
-			//if (Current.X == 20 && Current.Y == 25) { __debugbreak(); }
-			//if (Current.X == 19 && Current.Y == 25) { __debugbreak(); }
 
 			float CurrentCost = IntegrationFields[Current.Y * GRIDSIZE.X + Current.X].IntegratedCost;
 
@@ -464,7 +456,6 @@ Ray starts from Origin and extends in opposite direction of Goal
 			VisitCell(CostFields, WaveFront, FIntVector2(Current.X, Current.Y + 1), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront, bLosPass);
 			VisitCell(CostFields, WaveFront, FIntVector2(Current.X, Current.Y - 1), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront, bLosPass);
 		}
-		Debug::DrawIntegration(IntegrationFields);
 	}
 }
 
@@ -485,20 +476,26 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 		return IntegrationFields[ApplyDir(CurIdx, Next(NewDir))].IntegratedCost != FLT_MAX && IntegrationFields[ApplyDir(CurIdx, Prev(NewDir))].IntegratedCost != FLT_MAX; // TODO change to binary comparison?
 	};
 
+	for (int i = 0; i < FlowFields.Num(); ++i)
+	{
+		FlowFields[i].LOS = IntegrationFields[i].LOS;
+	}
+
 	while (Sources.empty() == false)
 	{
 		const int CurIdx = Sources.front();
 		Sources.pop();
-		check(IsValidIdx(CurIdx)); // TODO optimize: executed twice for each Idx
+		check(IsValidIdx(CurIdx)); // TODO optimize: executed twice for each Idx. Do we even need?
 
-		if (FlowFields[CurIdx].Completed || IntegrationFields[CurIdx].IntegratedCost == 0) // Reached other solution or goal
+		if (FlowFields[CurIdx].Completed || FlowFields[CurIdx].LOS) // Reached other solution or goal
 		{
 			continue;
 		}
 
-		float BestCost = IntegrationFields[CurIdx].IntegratedCost;
-		Dirs::EDirection BestDir;
-		int BestIdx = ApplyDir(CurIdx, Dirs::DIRS.at(BestDir));
+		float CurrentCost = IntegrationFields[CurIdx].IntegratedCost;
+		float BestCost = FLT_MAX;
+		Dirs::EDirection BestDir; // Begin somewhere
+		int BestIdx;
 
 		for (const auto& pair : Dirs::DIRS) {
 			Dirs::EDirection NewDir = pair.first;
@@ -508,12 +505,15 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 
 				if (Dirs::IsDiagonal(NewDir) && DiagonalReachable(CurIdx, NewDir) == false) continue;
 
-				if (BestCost > IntegrationFields[NewIdx].IntegratedCost)
+
+				float LosBonus = (IntegrationFields[NewIdx].IntegratedCost - CurrentCost) * IntegrationFields[NewIdx].LOS * 10.f; // Prefer LOS only if contributes to goal
+				float NewCost = IntegrationFields[NewIdx].IntegratedCost + LosBonus;
+				//if (CurIdx == 62) { __debugbreak(); }
+				if (NewCost < BestCost) 
 				{
 					BestIdx = NewIdx;
-					BestCost = IntegrationFields[NewIdx].IntegratedCost;
+					BestCost = NewCost;
 					BestDir = NewDir;
-
 				}
 			}
 		}
@@ -578,22 +578,24 @@ void DoFlowTiles(UWorld* World)
 	// runLos()
 	// remove after runLos() is implemented
 	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].IntegratedCost = 0;
+	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].LOS = true;
 
 
 	Eikonal::PropagateWave(CostFields, IntegrationFields, WaveFront, /*bLosPass =*/ true ,Goal, SecondWaveFront);
-	//Eikonal::PropagateWave(CostFields, IntegrationFields, SecondWaveFront, /*bLosPass =*/ false, Goal, DummyWaveFront);
+	Eikonal::PropagateWave(CostFields, IntegrationFields, SecondWaveFront, /*bLosPass =*/ false, Goal, DummyWaveFront);
+	Debug::DrawIntegration(IntegrationFields);
 
-	//TArray<FlowField> FlowFields;
-	//FlowFields.Init({Dirs::EDirection(), false, 0}, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
-	//std::deque<int> Sources; // TODO optimize
-	////Sources.push(25 * GRIDSIZE.X + 27);
-	//Sources.push(2 * GRIDSIZE.X + 2);
-	//Sources.push(27 * GRIDSIZE.X + 2);
-	//Sources.push(2 * GRIDSIZE.X + 27);
-	////Sources.push(10 * GRIDSIZE.X + 20);
-	//CalculateFlowFields(IntegrationFields, Sources, FlowFields);
+	TArray<FlowField> FlowFields;
+	FlowFields.Init({Dirs::EDirection(), false, 0}, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
+	std::queue<int> Sources; // TODO optimize
+	//Sources.push(25 * GRIDSIZE.X + 27);
+	Sources.push(2 * GRIDSIZE.X + 2);
+	Sources.push(27 * GRIDSIZE.X + 2);
+	Sources.push(2 * GRIDSIZE.X + 27);
+	//Sources.push(10 * GRIDSIZE.X + 20);
+	CalculateFlowFields(IntegrationFields, Sources, FlowFields);
 
-	//Debug::Draw(World, FlowFields);
+	Debug::Draw(World, FlowFields);
 }
 
 // TESTS

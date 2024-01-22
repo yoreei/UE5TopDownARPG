@@ -1,5 +1,22 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+#include "CrowdPF.h"
+
+#define LOCTEXT_NAMESPACE "FCrowdPFModule"
+
+void FCrowdPFModule::StartupModule()
+{
+	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
+}
+
+void FCrowdPFModule::ShutdownModule()
+{
+	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
+	// we call this function before unloading the module.
+}
+
+// Copyright Epic Games, Inc. All Rights Reserved.
+
 #include "UE5TopDownARPGPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
@@ -33,7 +50,7 @@ const float bDRAW_COSTS = false;
 const float bDRAW_INTEGRATION = true;
 
 const FVector COST_TRACE_Y_START = { 0.f, 0.f, 250.f };
-const FVector COST_TRACE_DIRECTION {0.f, 0.f, -100};
+const FVector COST_TRACE_DIRECTION{ 0.f, 0.f, -100 };
 const FIntVector2 GRIDSIZE{ 30, 30 };
 
 namespace Dirs
@@ -61,17 +78,17 @@ namespace Dirs
 	};
 
 	static const FIntVector2 SW{ -1, -1 };
-	static const FIntVector2 W { -1,  0 };
+	static const FIntVector2 W{ -1,  0 };
 	static const FIntVector2 NW{ -1,  1 };
-	static const FIntVector2 N {  0,  1 };
-	static const FIntVector2 NE{  1,  1 };
-	static const FIntVector2 E {  1,  0 };
-	static const FIntVector2 SE{  1, -1 };
-	static const FIntVector2 S {  0, -1 };
+	static const FIntVector2 N{ 0,  1 };
+	static const FIntVector2 NE{ 1,  1 };
+	static const FIntVector2 E{ 1,  0 };
+	static const FIntVector2 SE{ 1, -1 };
+	static const FIntVector2 S{ 0, -1 };
 
 	static const bool IsDiagonal(EDirection Dir) { return Dir % 2 == 0; }
-	static const FIntVector2 Next(EDirection Dir) { return DIRS.at( EDirection((Dir + 1) % 8) ); }
-	static const FIntVector2 Prev(EDirection Dir) { return DIRS.at( EDirection((Dir + 7) % 8) ); }
+	static const FIntVector2 Next(EDirection Dir) { return DIRS.at(EDirection((Dir + 1) % 8)); }
+	static const FIntVector2 Prev(EDirection Dir) { return DIRS.at(EDirection((Dir + 7) % 8)); }
 }
 
 static const int ApplyDir(const int Idx, const FIntVector2& Dir) {
@@ -97,7 +114,7 @@ bool IsInGrid(int X, int Y)
 }
 
 bool IsInGrid(const FIntVector2& Cell) {
-	return IsInGrid(Cell.X ,Cell.Y);
+	return IsInGrid(Cell.X, Cell.Y);
 }
 
 bool IsInGrid(int Idx)
@@ -137,7 +154,7 @@ FVector2D ToVector2D(const FIntVector2& IntVector2)
 
 namespace Debug
 {
-	#define BREAK_IF_EQUAL(current, at) if ((current) == (at)) { __debugbreak(); }
+#define BREAK_IF_EQUAL(current, at) if ((current) == (at)) { __debugbreak(); }
 
 	const float LOS_FLAG_HEIGHT = PLANE_HEIGHT + 1.f;
 	const float TEXT_HEIGHT = PLANE_HEIGHT + 2.f;
@@ -146,7 +163,7 @@ namespace Debug
 
 	void DrawCosts(const TArray<uint8_t>& CostFields)
 	{
-		if (!bDRAW_COSTS) { return;  }
+		if (!bDRAW_COSTS) { return; }
 		ensure(pWorld);
 		for (int y = 0; y < GRIDSIZE.Y; ++y)
 		{
@@ -180,7 +197,7 @@ namespace Debug
 						IntegratedCost = "MAX";
 					}
 
-					auto TextActor = pWorld->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), TextStart, FRotator(90,0,180), SpawnParameters);
+					auto TextActor = pWorld->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), TextStart, FRotator(90, 0, 180), SpawnParameters);
 					TextActor->GetTextRender()->SetText(FText::FromString(IntegratedCost));
 					TextActor->GetTextRender()->SetTextRenderColor(FColor::Magenta);
 				}
@@ -199,10 +216,10 @@ namespace Debug
 					// UE_LOG(LogUE5TopDownARPG, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GRIDSIZE.X + j]);
 					FVector Points[]{
 						{5.f, 5.f, 0.f},
-						{CELL_SIZE - 5.f, CELL_SIZE -5.f, 0.f}
+						{CELL_SIZE - 5.f, CELL_SIZE - 5.f, 0.f}
 					};
 					FBox Box{ Points, 2 };
-					FTransform Transform { FVector(x * CELL_SIZE, y * CELL_SIZE, LOS_FLAG_HEIGHT)};
+					FTransform Transform{ FVector(x * CELL_SIZE, y * CELL_SIZE, LOS_FLAG_HEIGHT) };
 					FColor Color = IntegrationFields[y * GRIDSIZE.X + x].LOS ? FColor::White : FColor::Blue;
 					if (IntegrationFields[y * GRIDSIZE.X + x].LOS == false)
 					{
@@ -264,7 +281,7 @@ namespace Debug
 	/*
 	Origin in World Coordinates
 	*/
-	void DrawLOS(FVector2D NormDir, FVector2D Origin = {0.f,0.f}, int Scale = 1000000)
+	void DrawLOS(FVector2D NormDir, FVector2D Origin = { 0.f,0.f }, int Scale = 1000000)
 	{
 		FVector2D Direction = NormDir * Scale;
 		FVector2D End = Direction + Origin;
@@ -302,8 +319,8 @@ namespace Debug
 		{
 			for (int x = 0; x < GRIDSIZE.X; ++x)
 			{
-				FVector TextStart = { x * CELL_SIZE + Q_CELL_SIZE, y * CELL_SIZE, TEXT_HEIGHT}; // Bottom part of cell // TODO why x,y reversed?
-					
+				FVector TextStart = { x * CELL_SIZE + Q_CELL_SIZE, y * CELL_SIZE, TEXT_HEIGHT }; // Bottom part of cell // TODO why x,y reversed?
+
 				// UE_LOG(LogUE5TopDownARPG, Log, TEXT("IntegrationFields [%d][%d] = [%s]"), i, j, *IntegratedCost
 				FText Coords = FText::FromString(" [" + FString::FromInt(x) + ", " + FString::FromInt(y) + "]");
 				FActorSpawnParameters SpawnParameters;
@@ -336,7 +353,7 @@ Ray starts from Origin and extends in opposite direction of Goal
 		while (IsWall(CostFields, Origin) == false) {
 			// Mark the current cell as blocked
 			if (IsInGrid(Origin))
-			{	
+			{
 				LOS.push_back(Origin);
 			}
 
@@ -398,7 +415,7 @@ Ray starts from Origin and extends in opposite direction of Goal
 
 	void VisitCell(const TArray<uint8_t>& CostFields, std::deque<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields, OUT std::deque<FIntVector2>& SecondWaveFront, bool bLosPass) {
 		UE_LOG(LogUE5TopDownARPG, Log, TEXT("VisitCell Processing [%d, %d]"), Cell.X, Cell.Y);
-		
+
 		if (IsInGrid(Cell) == false || IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].LOS)
 		{
 			return;
@@ -474,7 +491,7 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 
 	auto DiagonalReachable = [&IntegrationFields](const int CurIdx, const Dirs::EDirection NewDir) {
 		return IntegrationFields[ApplyDir(CurIdx, Next(NewDir))].IntegratedCost != FLT_MAX && IntegrationFields[ApplyDir(CurIdx, Prev(NewDir))].IntegratedCost != FLT_MAX; // TODO change to binary comparison?
-	};
+		};
 
 	for (int i = 0; i < FlowFields.Num(); ++i)
 	{
@@ -487,12 +504,12 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 		Sources.pop();
 		check(IsValidIdx(CurIdx)); // TODO optimize: executed twice for each Idx. Do we even need?
 
-		if (CurIdx == 62) { __debugbreak(); }
 		if (FlowFields[CurIdx].Completed || FlowFields[CurIdx].LOS) // Reached other solution or goal
 		{
 			continue;
 		}
 
+		float CurrentCost = IntegrationFields[CurIdx].IntegratedCost;
 		float BestCost = FLT_MAX;
 		Dirs::EDirection BestDir; // Begin somewhere
 		int BestIdx;
@@ -505,20 +522,22 @@ void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::q
 
 				if (Dirs::IsDiagonal(NewDir) && DiagonalReachable(CurIdx, NewDir) == false) continue;
 
-				float NewCost = IntegrationFields[NewIdx].IntegratedCost - 10.f * IntegrationFields[NewIdx].LOS; // Prefer LOS
-				if (BestCost > NewCost) 
+
+				float LosBonus = (IntegrationFields[NewIdx].IntegratedCost - CurrentCost) * IntegrationFields[NewIdx].LOS * 10.f; // Prefer LOS only if contributes to goal
+				float NewCost = IntegrationFields[NewIdx].IntegratedCost + LosBonus;
+				//if (CurIdx == 62) { __debugbreak(); }
+				if (NewCost < BestCost)
 				{
 					BestIdx = NewIdx;
 					BestCost = NewCost;
 					BestDir = NewDir;
-
 				}
 			}
 		}
 		FlowFields[CurIdx].Dir = BestDir;
 		FlowFields[CurIdx].Completed = true;
 		Sources.push(BestIdx);
-		
+
 		//UE_LOG(LogUE5TopDownARPG, Log, TEXT("CalculateFlowFields [%d].Dir = %d"), CurIdx, FlowFields[CurIdx].Dir);
 	}
 }
@@ -579,12 +598,12 @@ void DoFlowTiles(UWorld* World)
 	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].LOS = true;
 
 
-	Eikonal::PropagateWave(CostFields, IntegrationFields, WaveFront, /*bLosPass =*/ true ,Goal, SecondWaveFront);
+	Eikonal::PropagateWave(CostFields, IntegrationFields, WaveFront, /*bLosPass =*/ true, Goal, SecondWaveFront);
 	Eikonal::PropagateWave(CostFields, IntegrationFields, SecondWaveFront, /*bLosPass =*/ false, Goal, DummyWaveFront);
 	Debug::DrawIntegration(IntegrationFields);
 
 	TArray<FlowField> FlowFields;
-	FlowFields.Init({Dirs::EDirection(), false, 0}, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
+	FlowFields.Init({ Dirs::EDirection(), false, 0 }, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
 	std::queue<int> Sources; // TODO optimize
 	//Sources.push(25 * GRIDSIZE.X + 27);
 	Sources.push(2 * GRIDSIZE.X + 2);
@@ -603,150 +622,28 @@ bool Test_BresenhamsRay2D(UWorld* World)
 	return false;
 }
 
-AUE5TopDownARPGPlayerController::AUE5TopDownARPGPlayerController()
-{
-	bShowMouseCursor = true;
-	DefaultMouseCursor = EMouseCursor::Default;
-	CachedDestination = FVector::ZeroVector;
-	FollowTime = 0.f;
-}
 
-void AUE5TopDownARPGPlayerController::OnPlayerDied()
-{
-	AUE5TopDownARPGHUD* HUD = Cast<AUE5TopDownARPGHUD>(GetHUD());
-	if (IsValid(HUD))
-	{
-		HUD->ShowEndGameScreen();
+class CrowdPfImpl {
+public:
+	void doSomethingImpl() {
+		// Implementation details
 	}
+};
+
+MyClass::MyClass() : pImpl(std::make_unique<MyClassImpl>()) {}
+
+MyClass::~MyClass() = default;  // Destructor definition
+
+void FCrowdPFModule::doSomething() {
+	pImpl->doSomethingImpl();
 }
 
-void AUE5TopDownARPGPlayerController::BeginPlay()
-{
-	// Call the base class  
-	Super::BeginPlay();
 
-	//Add Input Mapping Context
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
-	}
 
-	UWorld* World = GetWorld();
-	ensure(World);
 
-	DoFlowTiles(World);
-}
 
-void AUE5TopDownARPGPlayerController::SetupInputComponent()
-{
-	// set up gameplay key bindings
-	Super::SetupInputComponent();
 
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent))
-	{
-		// Setup mouse input events
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &AUE5TopDownARPGPlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &AUE5TopDownARPGPlayerController::OnSetDestinationTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &AUE5TopDownARPGPlayerController::OnSetDestinationReleased);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &AUE5TopDownARPGPlayerController::OnSetDestinationReleased);
 
-		EnhancedInputComponent->BindAction(ActivateAbilityAction, ETriggerEvent::Started, this, &AUE5TopDownARPGPlayerController::OnActivateAbilityStarted);
-
-		// Setup touch input events
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &AUE5TopDownARPGPlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &AUE5TopDownARPGPlayerController::OnTouchTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &AUE5TopDownARPGPlayerController::OnTouchReleased);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &AUE5TopDownARPGPlayerController::OnTouchReleased);
-	}
-}
-
-void AUE5TopDownARPGPlayerController::OnInputStarted()
-{
-	StopMovement();
-}
-
-// Triggered every frame when the input is held down
-void AUE5TopDownARPGPlayerController::OnSetDestinationTriggered()
-{
-	// We flag that the input is being pressed
-	FollowTime += GetWorld()->GetDeltaSeconds();
+#undef LOCTEXT_NAMESPACE
 	
-	// We look for the location in the world where the player has pressed the input
-	FHitResult Hit;
-	bool bHitSuccessful = false;
-	if (bIsTouch)
-	{
-		bHitSuccessful = GetHitResultUnderFinger(ETouchIndex::Touch1, ECollisionChannel::ECC_Visibility, true, Hit);
-	}
-	else
-	{
-		bHitSuccessful = GetHitResultUnderCursor(ECollisionChannel::ECC_Visibility, true, Hit);
-	}
-
-	// If we hit a surface, cache the location
-	if (bHitSuccessful)
-	{
-		CachedDestination = Hit.Location;
-	}
-	
-	// Move towards mouse pointer or touch
-	APawn* ControlledPawn = GetPawn();
-	if (ControlledPawn != nullptr)
-	{
-		FVector WorldDirection = (CachedDestination - ControlledPawn->GetActorLocation()).GetSafeNormal();
-		ControlledPawn->AddMovementInput(WorldDirection, 1.0, false);
-	}
-}
-
-void AUE5TopDownARPGPlayerController::OnSetDestinationReleased()
-{
-	// If it was a short press
-	if (FollowTime <= ShortPressThreshold)
-	{
-		// We move there and spawn some particles
-		UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, CachedDestination);
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FXCursor, CachedDestination, FRotator::ZeroRotator, FVector(1.f, 1.f, 1.f), true, true, ENCPoolMethod::None, true);
-	}
-
-	FollowTime = 0.f;
-}
-
-// Triggered every frame when the input is held down
-void AUE5TopDownARPGPlayerController::OnTouchTriggered()
-{
-	bIsTouch = true;
-	OnSetDestinationTriggered();
-}
-
-void AUE5TopDownARPGPlayerController::OnTouchReleased()
-{
-	bIsTouch = false;
-	OnSetDestinationReleased();
-}
-
-void AUE5TopDownARPGPlayerController::OnActivateAbilityStarted()
-{
-	UE_LOG(LogUE5TopDownARPG, Log, TEXT("OnActivateAbilityStarted"));
-
-	AUE5TopDownARPGCharacter* ARPGCharacter = Cast<AUE5TopDownARPGCharacter>(GetPawn());
-	if (IsValid(ARPGCharacter))
-	{
-		FHitResult Hit;
-		bool bHitSuccessful = false;
-		if (bIsTouch)
-		{
-			bHitSuccessful = GetHitResultUnderFinger(ETouchIndex::Touch1, ECollisionChannel::ECC_Visibility, true, Hit);
-		}
-		else
-		{
-			bHitSuccessful = GetHitResultUnderCursor(ECollisionChannel::ECC_Visibility, true, Hit);
-		}
-
-		// If we hit a surface, cache the location
-		if (bHitSuccessful)
-		{
-			ARPGCharacter->ActivateAbility(Hit.Location);
-		}
-	}
-}
+IMPLEMENT_MODULE(FCrowdPFModule, CrowdPF)

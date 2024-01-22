@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "CrowdPF",
+	"Description": "Efficient Crowd Pathfinding Using Flow Tiles",
+	"Category": "Navigation",
+	"CreatedBy": "Yoreei",
+	"CreatedByURL": "https://github.com/yoreei",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/yoreei",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "CrowdPF",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

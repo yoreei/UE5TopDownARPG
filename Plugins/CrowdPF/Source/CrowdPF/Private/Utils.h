@@ -42,6 +42,14 @@ FIntVector2 ToFIntVector2(int LinearIdx)
 	);
 }
 
+FIntVector2 ToFIntVector2(FVector Vect)
+{
+	return FIntVector2(
+		static_cast<int>(Vect.X),
+		static_cast<int>(Vect.Y)
+	);
+}
+
 int ToLinearIdx(FIntVector2 IntVector2)
 {
 	return IntVector2.Y * GRIDSIZE.X + IntVector2.X;

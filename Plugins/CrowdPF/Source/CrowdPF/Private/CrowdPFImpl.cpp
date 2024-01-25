@@ -256,6 +256,35 @@ void FCrowdPFModule::Impl::CalculateCostFields(UWorld* World, OUT TArray<uint8_t
 	DrawCosts(CostFields);
 }
 
+void GetGoal(UWorld* pWorld, FName Tag, FIntVector2& Goal)
+{
+	TArray<AActor*> FoundGoals;
+	UGameplayStatics::GetAllActorsWithTag(pWorld, Tag, FoundGoals);
+	check(FoundGoals.Num() == 1 && IsValid(FoundGoals[0]));
+	AActor* GoalActor = FoundGoals[0];
+	FVector GoalVector = GoalActor->GetActorLocation();
+	Goal.X = (int)(GoalVector.X) / CELL_SIZE; // TODO use round?
+	Goal.Y = (int)(GoalVector.Y) / CELL_SIZE;
+}
+
+void GetCrowd(UWorld* pWorld, FName Tag, std::queue<int>& Crowd)
+{
+	TArray<AActor*> Members;
+	UGameplayStatics::GetAllActorsWithTag(pWorld, Tag, Members);
+	for (const AActor* Member : Members)
+	{
+		FVector MemberVect = Member->GetActorLocation();
+		MemberVect.X = (int)(MemberVect.X) / CELL_SIZE; // TODO use round?
+		MemberVect.Y = (int)(MemberVect.Y) / CELL_SIZE;
+		FIntVector2 IntMemberVect = ToFIntVector2(MemberVect);
+		Crowd.push(ToLinearIdx(IntMemberVect));
+	}
+
+	//Crowd.push(2 * GRIDSIZE.X + 2);
+	//Crowd.push(27 * GRIDSIZE.X + 2);
+	//Crowd.push(2 * GRIDSIZE.X + 27);
+}
+
 void FCrowdPFModule::Impl::DoFlowTiles()
 {
 	ensure(pWorld);
@@ -266,16 +295,9 @@ void FCrowdPFModule::Impl::DoFlowTiles()
 	DrawCoords();
 
 	FIntVector2 Goal;
-	{
-		TArray<AActor*> FoundGoals;
-		UGameplayStatics::GetAllActorsWithTag(pWorld, "Goal", FoundGoals);
-		check(FoundGoals.Num() == 1 && IsValid(FoundGoals[0]));
-		AActor* GoalActor = FoundGoals[0];
-		FVector GoalVector = GoalActor->GetActorLocation();
-		Goal.X = (int)(GoalVector.X) / CELL_SIZE; // TODO use round?
-		Goal.Y = (int)(GoalVector.Y) / CELL_SIZE;
-		//UE_LOG(LogCrowdPF, Log, TEXT("Found Goal at [%d, %d]"), Goal.X, Goal.Y);
-	}
+	GetGoal(pWorld, "Goal", Goal);
+	
+
 
 	DrawBox(Goal);
 	std::deque<FIntVector2> WaveFront;
@@ -296,13 +318,11 @@ void FCrowdPFModule::Impl::DoFlowTiles()
 
 	TArray<FlowField> FlowFields;
 	FlowFields.Init({ Dirs::EDirection(), false, 0 }, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
-	std::queue<int> Sources; // TODO optimize
-	//Sources.push(25 * GRIDSIZE.X + 27);
-	Sources.push(2 * GRIDSIZE.X + 2);
-	Sources.push(27 * GRIDSIZE.X + 2);
-	Sources.push(2 * GRIDSIZE.X + 27);
-	//Sources.push(10 * GRIDSIZE.X + 20);
-	CalculateFlowFields(IntegrationFields, Sources, FlowFields);
+	std::queue<int> Crowd; // TODO optimize
+	GetCrowd(pWorld, "Crowd", Crowd);
+	check(Crowd.size() > 0);
+
+	CalculateFlowFields(IntegrationFields, Crowd, FlowFields);
 
 	DrawFlows(FlowFields);
 }

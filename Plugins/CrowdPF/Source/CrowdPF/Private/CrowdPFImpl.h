@@ -50,13 +50,13 @@ struct FlowField {
 
 struct IntegrationField {
 	float IntegratedCost = FLT_MAX;
-	uint8_t WaveFrontBlocked : 1;
+	uint8_t WaveFrontBlocked : 1; // TODO use bitset?
 	uint8_t LOS : 1;
 };
 
 class FCrowdPFModule::Impl {
 public:
-	void DoFlowTiles();
+	void DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath);
 	void Init(UWorld* _World);
 private:
 

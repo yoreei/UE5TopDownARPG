@@ -53,14 +53,13 @@ void AUE5TopDownARPGPlayerController::BeginPlay()
 	UWorld* World = GetWorld();
 	ensure(World);
 
-	//auto CrowdPF = std::make_unique<FCrowdPFModule>(World);
-	//FCrowdPFModule& CrowdPFModule = FModuleManager::LoadModuleChecked<FCrowdPFModule>("CrowdPF");
-	FCrowdPFModule* CrowdPFModule = FModuleManager::LoadModulePtr<FCrowdPFModule>("CrowdPF");
-	if (CrowdPFModule)
-	{
-		CrowdPFModule->Init(World);
-		CrowdPFModule->DoFlowTiles(); //todo pimpl was nullptr
-	}
+	// this is how you init a module
+	//FCrowdPFModule* CrowdPFModule = FModuleManager::LoadModulePtr<FCrowdPFModule>("CrowdPF");
+	//if (CrowdPFModule)
+	//{
+	//	CrowdPFModule->Init(World);
+	//	CrowdPFModule->DoFlowTiles();
+	//}
 }
 
 void AUE5TopDownARPGPlayerController::SetupInputComponent()

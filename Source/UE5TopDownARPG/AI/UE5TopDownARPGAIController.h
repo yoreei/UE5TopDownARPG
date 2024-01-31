@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
+#include "CrowdPF/Public/CrowdPF.h"
 #include "UE5TopDownARPGAIController.generated.h"
 
 /**
@@ -18,8 +19,11 @@ public:
 	AUE5TopDownARPGAIController();
 
 protected:
+
+	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
+	virtual void FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query, FNavPathSharedPtr& OutPath) const override;
 
 	UPROPERTY()
 	class UBlackboardComponent* BlackboardComponent;
@@ -27,4 +31,9 @@ protected:
 	UPROPERTY()
 	class UBehaviorTreeComponent* BehaviorTreeComponent;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = CrowdPf)
+	bool UseCrowdPf;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = CrowdPf)
+	bool DrawDebugPath;
 };

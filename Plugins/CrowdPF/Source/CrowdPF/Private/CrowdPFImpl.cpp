@@ -36,7 +36,7 @@ FCrowdPFModule::FCrowdPFModule() { ModuleImplementation = MakeUnique<FCrowdPFMod
 FCrowdPFModule::FCrowdPFModule(FCrowdPFModule&&) = default;
 FCrowdPFModule::~FCrowdPFModule() = default;
 FCrowdPFModule& FCrowdPFModule::operator=(FCrowdPFModule&&) = default;
-void FCrowdPFModule::DoFlowTiles() { ModuleImplementation->DoFlowTiles(); }
+void FCrowdPFModule::DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath) { ModuleImplementation->DoFlowTiles(GoalActor, OutPath); }
 void FCrowdPFModule::Init(UWorld* _World) { ModuleImplementation->Init(_World); } // TODO better handling of World?
 
 /* Begin Eikonal */
@@ -285,7 +285,7 @@ void GetCrowd(UWorld* pWorld, FName Tag, std::queue<int>& Crowd)
 	//Crowd.push(2 * GRIDSIZE.X + 27);
 }
 
-void FCrowdPFModule::Impl::DoFlowTiles()
+void FCrowdPFModule::Impl::DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath)
 {
 	ensure(pWorld);
 	TArray<uint8_t> CostFields;

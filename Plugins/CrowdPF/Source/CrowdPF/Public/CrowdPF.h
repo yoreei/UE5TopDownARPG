@@ -22,15 +22,14 @@ class CROWDPF_API FCrowdPFModule : public IModuleInterface
 public:
     FCrowdPFModule();
     ~FCrowdPFModule();
-    FCrowdPFModule(UWorld* pWorld);
     FCrowdPFModule(FCrowdPFModule&&);
     FCrowdPFModule(const FCrowdPFModule&) = delete;
     FCrowdPFModule& operator=(FCrowdPFModule&&);
     FCrowdPFModule& operator=(const FCrowdPFModule&) = delete;
 
     /** Public Interface of FCrowdPFModule */
-    void Init(UWorld* _World);
-    void DoFlowTiles();
+    void Init(UWorld* _World); // TODO refactor into own class (factory)
+    void DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath);
 
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;

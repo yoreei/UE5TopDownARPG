@@ -15,6 +15,7 @@
 #include <queue>
 #include <climits>
 #include <cmath>
+#include <NavigationData.h>
 
 #define LOCTEXT_NAMESPACE "FCrowdPFModule"
 
@@ -287,6 +288,9 @@ void GetCrowd(UWorld* pWorld, FName Tag, std::queue<int>& Crowd)
 
 void FCrowdPFModule::Impl::DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath)
 {
+	TArray<FVector> Points{ {0.f,0.f,0.f} };
+	OutPath = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(Points); ;
+
 	ensure(pWorld);
 	TArray<uint8_t> CostFields;
 	CostFields.Init(1, GRIDSIZE.X * GRIDSIZE.Y);

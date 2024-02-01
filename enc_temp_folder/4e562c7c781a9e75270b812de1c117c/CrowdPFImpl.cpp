@@ -288,11 +288,8 @@ void GetCrowd(UWorld* pWorld, FName Tag, std::queue<int>& Crowd)
 
 void FCrowdPFModule::Impl::DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath)
 {
-	TArray<FVector> Points{ {1940.f,350.f,60.f} };
-
-
+	TArray<FVector> Points{ {0.f,0.f,0.f} };
 	OutPath = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(Points);
-	OutPath->GetPathPoints()[0].Flags = 81665;
 
 	ensure(pWorld);
 	TArray<uint8_t> CostFields;

@@ -100,11 +100,11 @@ void AUE5TopDownARPGAIController::FindPathForMoveRequest(const FAIMoveRequest& M
             CrowdPFModule->DoFlowTiles(MoveRequest.GetGoalActor(), OutPath);
             
                 //extras
-            OutPath->SetNavigationDataUsed(Query.NavData.GetEvenIfUnreachable());
-            OutPath->SetGoalActorObservation(*MoveRequest.GetGoalActor(), 1000.f);
-            OutPath->SetQuerier(this);
-            OutPath->SetTimeStamp(GetWorld()->GetTimeSeconds());
-            OutPath->SetGoalActorObservation(*MoveRequest.GetGoalActor(), 100.0f);
+            //OutPath->SetNavigationDataUsed(Query.NavData.GetEvenIfUnreachable());
+            //OutPath->SetGoalActorObservation(*MoveRequest.GetGoalActor(), 1000.f);
+            //OutPath->SetQuerier(this);
+            //OutPath->SetTimeStamp(GetWorld()->GetTimeSeconds());
+            //OutPath->SetGoalActorObservation(*MoveRequest.GetGoalActor(), 100.0f);
         }
         else
         {

@@ -29,11 +29,6 @@ bool IsInGrid(int Idx)
 	return IsInGrid(X, Y);
 }
 
-bool IsWall(const TArray<uint8_t>& CostFields, const FIntVector2& Cell)
-{
-	return CostFields[Cell.Y * GRIDSIZE.X + Cell.X] == UINT8_MAX;
-}
-
 FIntVector2 ToFIntVector2(int LinearIdx)
 {
 	return FIntVector2(
@@ -41,6 +36,24 @@ FIntVector2 ToFIntVector2(int LinearIdx)
 		LinearIdx / GRIDSIZE.X
 	);
 }
+
+FIntVector2 WorldVectToGridVect(const FVector& Vect)
+{
+	return FIntVector2(
+		Vect.X / CELL_SIZE,
+		Vect.Y / CELL_SIZE
+	);
+}
+
+FVector GridVectToWorldVect(const FIntVector2& Vect)
+{
+	return FVector(
+		Vect.X * CELL_SIZE,
+		Vect.Y * CELL_SIZE,
+		PLANE_HEIGHT
+	);
+}
+
 
 FIntVector2 ToFIntVector2(FVector Vect)
 {

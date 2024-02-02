@@ -37,14 +37,20 @@ FCrowdPFModule::FCrowdPFModule() { ModuleImplementation = MakeUnique<FCrowdPFMod
 FCrowdPFModule::FCrowdPFModule(FCrowdPFModule&&) = default;
 FCrowdPFModule::~FCrowdPFModule() = default;
 FCrowdPFModule& FCrowdPFModule::operator=(FCrowdPFModule&&) = default;
-void FCrowdPFModule::DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath) { ModuleImplementation->DoFlowTiles(GoalActor, OutPath); }
+void FCrowdPFModule::DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath) { ModuleImplementation->DoFlowTiles(WorldOrigin, WorldGoal, OutPath); }
 void FCrowdPFModule::Init(UWorld* _World) { ModuleImplementation->Init(_World); } // TODO better handling of World?
+
+
+bool FCrowdPFModule::Impl::IsWall(const FIntVector2& Cell) const
+{
+	return CostFields[Cell.Y * GRIDSIZE.X + Cell.X] == UINT8_MAX;
+}
 
 /* Begin Eikonal */
 /*
 Ray starts from Origin and extends in opposite direction of Goal
 */
-void FCrowdPFModule::Impl::BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, FIntVector2 Origin, OUT std::deque<FIntVector2>& LOS)
+void FCrowdPFModule::Impl::BresenhamsRay2D(const FIntVector2& Goal, FIntVector2 Origin, OUT std::deque<FIntVector2>& LOS)
 {
 	// Calculate end point - large enough to ensure it goes "off-grid"
 	FIntVector2 Direction = (Origin - Goal) * 1000;
@@ -54,7 +60,7 @@ void FCrowdPFModule::Impl::BresenhamsRay2D(const TArray<uint8_t>& CostFields, co
 	int dy = -FMath::Abs(Direction.Y - Origin.Y), sy = Origin.Y < Direction.Y ? 1 : -1;
 	int err = dx + dy, e2;
 
-	while (IsWall(CostFields, Origin) == false) {
+	while (IsWall(Origin) == false) {
 		// Mark the current cell as blocked
 		if (IsInGrid(Origin))
 		{
@@ -71,7 +77,7 @@ void FCrowdPFModule::Impl::BresenhamsRay2D(const TArray<uint8_t>& CostFields, co
 /*
 Cell & Goal: Grid Coordinates
 */
-void FCrowdPFModule::Impl::GetLos(const TArray<uint8_t>& CostFields, const FIntVector2& Cell, const FIntVector2& Goal, std::deque<FIntVector2>& Los)
+void FCrowdPFModule::Impl::GetLos(const FIntVector2& Cell, const FIntVector2& Goal, std::deque<FIntVector2>& Los)
 {
 	FVector2D GoalToCell = ToVector2D(Cell - Goal);
 	bool isDiagonalOrientation = GoalToCell.X * GoalToCell.Y > 0;
@@ -80,44 +86,44 @@ void FCrowdPFModule::Impl::GetLos(const TArray<uint8_t>& CostFields, const FIntV
 	{
 		FIntVector2 sideNW = Cell + Dirs::NW;
 		if (IsInGrid(sideNW)
-			&& !IsWall(CostFields, sideNW)
-			&& !IsWall(CostFields, Cell + Dirs::W)
-			&& !IsWall(CostFields, Cell + Dirs::N))
+			&& !IsWall(sideNW)
+			&& !IsWall(Cell + Dirs::W)
+			&& !IsWall(Cell + Dirs::N))
 		{
-			BresenhamsRay2D(CostFields, Goal + Dirs::S, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::W, OUT Los);
+			BresenhamsRay2D(Goal + Dirs::S, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::W, OUT Los);
 		}
 
 		FIntVector2 sideSE = Cell + Dirs::SE;
 		if (IsInGrid(sideSE)
-			&& !IsWall(CostFields, sideSE)
-			&& !IsWall(CostFields, Cell + Dirs::S)
-			&& !IsWall(CostFields, Cell + Dirs::E))
+			&& !IsWall(sideSE)
+			&& !IsWall(Cell + Dirs::S)
+			&& !IsWall(Cell + Dirs::E))
 		{
-			BresenhamsRay2D(CostFields, Goal + Dirs::N, GoalToCell.Y > 0 ? Cell + Dirs::E : Cell + Dirs::S, OUT Los);
+			BresenhamsRay2D(Goal + Dirs::N, GoalToCell.Y > 0 ? Cell + Dirs::E : Cell + Dirs::S, OUT Los);
 		}
 	}
 	else {
 		FIntVector2 sideNE = Cell + Dirs::NE;
 		if (IsInGrid(sideNE)
-			&& !IsWall(CostFields, sideNE)
-			&& !IsWall(CostFields, Cell + Dirs::N)
-			&& !IsWall(CostFields, Cell + Dirs::E))
+			&& !IsWall(sideNE)
+			&& !IsWall(Cell + Dirs::N)
+			&& !IsWall(Cell + Dirs::E))
 		{
-			BresenhamsRay2D(CostFields, Goal + Dirs::S, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::E, OUT Los);
+			BresenhamsRay2D(Goal + Dirs::S, GoalToCell.Y > 0 ? Cell + Dirs::N : Cell + Dirs::E, OUT Los);
 		}
 
 		FIntVector2 sideSW = Cell + Dirs::SW;
 		if (IsInGrid(sideSW)
-			&& !IsWall(CostFields, sideSW)
-			&& !IsWall(CostFields, Cell + Dirs::S)
-			&& !IsWall(CostFields, Cell + Dirs::W))
+			&& !IsWall(sideSW)
+			&& !IsWall(Cell + Dirs::S)
+			&& !IsWall(Cell + Dirs::W))
 		{
-			BresenhamsRay2D(CostFields, Goal + Dirs::N, GoalToCell.Y > 0 ? Cell + Dirs::W : Cell + Dirs::S, OUT Los);
+			BresenhamsRay2D(Goal + Dirs::N, GoalToCell.Y > 0 ? Cell + Dirs::W : Cell + Dirs::S, OUT Los);
 		}
 	}
 }
 
-void FCrowdPFModule::Impl::VisitCell(const TArray<uint8_t>& CostFields, std::deque<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields, OUT std::deque<FIntVector2>& SecondWaveFront, bool bLosPass) {
+void FCrowdPFModule::Impl::VisitCell(std::deque<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront, bool bLosPass) {
 	UE_LOG(LogCrowdPF, Log, TEXT("VisitCell Processing [%d, %d]"), Cell.X, Cell.Y);
 
 	if (IsInGrid(Cell) == false || IntegrationFields[Cell.Y * GRIDSIZE.X + Cell.X].LOS)
@@ -126,15 +132,15 @@ void FCrowdPFModule::Impl::VisitCell(const TArray<uint8_t>& CostFields, std::deq
 	}
 	//if (Cell.X == 22 && Cell.Y == 25) { __debugbreak(); }
 
-	if (!bLosPass && IsWall(CostFields, Cell)) // used to be !bLosPass &&
+	if (!bLosPass && IsWall(Cell)) // used to be !bLosPass &&
 	{
 		return;
 	}
 
-	if (bLosPass && IsWall(CostFields, Cell))
+	if (bLosPass && IsWall(Cell))
 	{
 		std::deque<FIntVector2> Los;
-		GetLos(CostFields, Cell, Goal, OUT Los);
+		GetLos(Cell, Goal, OUT Los);
 		for (auto& LosCell : Los)
 		{
 			int LosCellIdx = ToLinearIdx(LosCell);
@@ -163,7 +169,7 @@ void FCrowdPFModule::Impl::VisitCell(const TArray<uint8_t>& CostFields, std::deq
 	}
 }
 
-void FCrowdPFModule::Impl::PropagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::deque<FIntVector2>& WaveFront, bool bLosPass, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront)
+void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, bool bLosPass, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront)
 {
 
 	while (!WaveFront.empty()) {
@@ -172,49 +178,53 @@ void FCrowdPFModule::Impl::PropagateWave(const TArray<uint8_t>& CostFields, TArr
 
 		float CurrentCost = IntegrationFields[Current.Y * GRIDSIZE.X + Current.X].IntegratedCost;
 
-		VisitCell(CostFields, WaveFront, FIntVector2(Current.X + 1, Current.Y), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront, bLosPass);
-		VisitCell(CostFields, WaveFront, FIntVector2(Current.X - 1, Current.Y), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront, bLosPass);
-		VisitCell(CostFields, WaveFront, FIntVector2(Current.X, Current.Y + 1), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront, bLosPass);
-		VisitCell(CostFields, WaveFront, FIntVector2(Current.X, Current.Y - 1), CurrentCost, Goal, OUT IntegrationFields, SecondWaveFront, bLosPass);
+		VisitCell(WaveFront, FIntVector2(Current.X + 1, Current.Y), CurrentCost, Goal, SecondWaveFront, bLosPass);
+		VisitCell(WaveFront, FIntVector2(Current.X - 1, Current.Y), CurrentCost, Goal, SecondWaveFront, bLosPass);
+		VisitCell(WaveFront, FIntVector2(Current.X, Current.Y + 1), CurrentCost, Goal, SecondWaveFront, bLosPass);
+		VisitCell(WaveFront, FIntVector2(Current.X, Current.Y - 1), CurrentCost, Goal, SecondWaveFront, bLosPass);
 	}
 }
 /* End Eikonal*/
 
-void FCrowdPFModule::Impl::CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields)
+void FCrowdPFModule::Impl::ConvertFlowTilesToPath(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath)
 {
+	TArray<FVector> Points{ {1940.f,350.f,60.f},
+	{988.f, 551.f, 60.f},
+	{2650.f, 2550.f, 60.f} };
 
-	auto DiagonalReachable = [this, &IntegrationFields](const int CurIdx, const Dirs::EDirection NewDir) {
+	OutPath = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(Points);
+	OutPath->GetPathPoints()[0].Flags = 81665;
+	OutPath->GetPathPoints()[0].Flags = 81664;
+	OutPath->GetPathPoints()[0].Flags = 81666;
+}
+
+void FCrowdPFModule::Impl::CalculateFlowFields()
+{
+	auto DiagonalReachable = [this](const int CurIdx, const Dirs::EDirection NewDir) {
 		return IntegrationFields[ApplyDir(CurIdx, Next(NewDir))].IntegratedCost != FLT_MAX && IntegrationFields[ApplyDir(CurIdx, Prev(NewDir))].IntegratedCost != FLT_MAX; // TODO change to binary comparison?
 		};
 
 	for (int i = 0; i < FlowFields.Num(); ++i)
 	{
 		FlowFields[i].LOS = IntegrationFields[i].LOS;
-	}
 
-	while (Sources.empty() == false)
-	{
-		const int CurIdx = Sources.front();
-		Sources.pop();
-		check(IsValidIdx(CurIdx)); // TODO optimize: executed twice for each Idx. Do we even need?
-
-		if (FlowFields[CurIdx].Completed || FlowFields[CurIdx].LOS) // Reached other solution or goal
+		if (FlowFields[i].LOS)
 		{
 			continue;
 		}
 
-		float CurrentCost = IntegrationFields[CurIdx].IntegratedCost;
+		float CurrentCost = IntegrationFields[i].IntegratedCost;
 		float BestCost = FLT_MAX;
 		Dirs::EDirection BestDir = Dirs::EDirection::North; // Begin somewhere
 		int BestIdx;
 
 		for (const auto& pair : Dirs::DIRS) {
 			Dirs::EDirection NewDir = pair.first;
-			int NewIdx = ApplyDir(CurIdx, pair.second);
+			int NewIdx = ApplyDir(i, pair.second);
 
 			if (IsValidIdx(NewIdx) && IntegrationFields[NewIdx].IntegratedCost != FLT_MAX) { // TODO change to binary comparison?
 
-				if (Dirs::IsDiagonal(NewDir) && DiagonalReachable(CurIdx, NewDir) == false) continue;
+				if (Dirs::IsDiagonal(NewDir) && DiagonalReachable(i, NewDir) == false) continue;
 
 
 				float LosBonus = (IntegrationFields[NewIdx].IntegratedCost - CurrentCost) * IntegrationFields[NewIdx].LOS * 10.f; // Prefer LOS only if contributes to goal
@@ -228,18 +238,14 @@ void FCrowdPFModule::Impl::CalculateFlowFields(TArray<IntegrationField>& Integra
 				}
 			}
 		}
-		FlowFields[CurIdx].Dir = BestDir;
-		FlowFields[CurIdx].Completed = true;
-		Sources.push(BestIdx);
-
-		//UE_LOG(LogCrowdPF, Log, TEXT("CalculateFlowFields [%d].Dir = %d"), CurIdx, FlowFields[CurIdx].Dir);
+		FlowFields[i].Dir = BestDir;
+		FlowFields[i].Completed = true;
 	}
 }
 
-void FCrowdPFModule::Impl::CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields)
+void FCrowdPFModule::Impl::CalculateCostFields()
 {
-	ensure(World);
-
+	CostFields.Init(1, GRIDSIZE.X * GRIDSIZE.Y);
 	FVector HitLocation;
 	FHitResult OutHit;
 	for (int y = 0; y < GRIDSIZE.Y; ++y)
@@ -249,12 +255,12 @@ void FCrowdPFModule::Impl::CalculateCostFields(UWorld* World, OUT TArray<uint8_t
 			FVector RayStart = COST_TRACE_Y_START + FVector(x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2, 0.f);
 			FVector RayEnd = RayStart + COST_TRACE_DIRECTION;
 			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
-			bool bLineTraceObstructed = World->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
+			bool bLineTraceObstructed = pWorld->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
 
 			CostFields[y * GRIDSIZE.X + x] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}
 	}
-	DrawCosts(CostFields);
+	DrawCosts();
 }
 
 void GetGoal(UWorld* pWorld, FName Tag, FIntVector2& Goal)
@@ -286,54 +292,50 @@ void GetCrowd(UWorld* pWorld, FName Tag, std::queue<int>& Crowd)
 	//Crowd.push(2 * GRIDSIZE.X + 27);
 }
 
-void FCrowdPFModule::Impl::DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath)
+bool FCrowdPFModule::Impl::GetNeedToRecalculate(const FIntVector2& Goal)
 {
-	TArray<FVector> Points{ {1940.f,350.f,60.f},
-		{988.f, 551.f, 60.f},
-		{2650.f, 2550.f, 60.f} };
+	return NeedToRecalculate;
+}
 
-	OutPath = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(Points);
-	OutPath->GetPathPoints()[0].Flags = 81665;
-	OutPath->GetPathPoints()[0].Flags = 81664;
-	OutPath->GetPathPoints()[0].Flags = 81666;
+void FCrowdPFModule::Impl::SetNeedToRecalculate(const bool bValue)
+{
+	NeedToRecalculate = bValue;
+}
 
+void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath)
+{
 	ensure(pWorld);
-	TArray<uint8_t> CostFields;
-	CostFields.Init(1, GRIDSIZE.X * GRIDSIZE.Y);
-	CalculateCostFields(pWorld, CostFields);
 
-	DrawCoords();
+	FIntVector2 Goal = WorldVectToGridVect(WorldGoal);
+	FIntVector2 Origin = WorldVectToGridVect(WorldOrigin);
 
-	FIntVector2 Goal;
-	GetGoal(pWorld, "Goal", Goal);
-	
+	if (GetNeedToRecalculate(Goal))
+	{
+		//Cost Fields
+		CalculateCostFields();
+		DrawCoords();
+		DrawBox(Goal);
 
+		// Eikonal
+		std::deque<FIntVector2> WaveFront;
+		WaveFront.push_back(Goal);
+		std::deque<FIntVector2> SecondWaveFront;
+		std::deque<FIntVector2> DummyWaveFront; // TODO refactor
+		IntegrationFields.Init({ FLT_MAX, false, false }, GRIDSIZE.X * GRIDSIZE.Y);
+		IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].IntegratedCost = 0;
+		IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].LOS = true;
+		PropagateWave(WaveFront, /*bLosPass =*/ true, Goal, SecondWaveFront);
+		PropagateWave(SecondWaveFront, /*bLosPass =*/ false, Goal, DummyWaveFront); // todo templating
+		DrawIntegration();
 
-	DrawBox(Goal);
-	std::deque<FIntVector2> WaveFront;
-	WaveFront.push_back(Goal);
-	std::deque<FIntVector2> SecondWaveFront;
-	std::deque<FIntVector2> DummyWaveFront; // TODO refactor
-	TArray<IntegrationField> IntegrationFields;
-	IntegrationFields.Init({ FLT_MAX, false, false }, GRIDSIZE.X * GRIDSIZE.Y);
-	// runLos()
-	// remove after runLos() is implemented
-	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].IntegratedCost = 0;
-	IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].LOS = true;
+		// Flow Fields
+		FlowFields.Init({ Dirs::EDirection(), false, 0 }, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
+		CalculateFlowFields();
+		DrawFlows();
+		SetNeedToRecalculate(false);
+	}
+	ConvertFlowTilesToPath(WorldOrigin, WorldGoal, OutPath);
 
-
-	PropagateWave(CostFields, IntegrationFields, WaveFront, /*bLosPass =*/ true, Goal, SecondWaveFront);
-	PropagateWave(CostFields, IntegrationFields, SecondWaveFront, /*bLosPass =*/ false, Goal, DummyWaveFront); // todo templating
-	DrawIntegration(IntegrationFields);
-
-	FlowFields.Init({ Dirs::EDirection(), false, 0 }, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
-	std::queue<int> Crowd; // TODO optimize
-	GetCrowd(pWorld, "Crowd", Crowd);
-	check(Crowd.size() > 0);
-
-	CalculateFlowFields(IntegrationFields, Crowd, OutPath);
-
-	DrawFlows(FlowFields);
 }
 
 void FCrowdPFModule::Impl::Init(UWorld* _World)
@@ -341,7 +343,7 @@ void FCrowdPFModule::Impl::Init(UWorld* _World)
 	pWorld = _World;
 }
 
-void FCrowdPFModule::Impl::DrawCosts(const TArray<uint8_t>& CostFields)
+void FCrowdPFModule::Impl::DrawCosts()
 {
 	if (!bDRAW_COSTS) { return; }
 	ensure(pWorld);
@@ -357,7 +359,7 @@ void FCrowdPFModule::Impl::DrawCosts(const TArray<uint8_t>& CostFields)
 	}
 }
 
-void FCrowdPFModule::Impl::DrawIntegration(const TArray<IntegrationField>& IntegrationFields)
+void FCrowdPFModule::Impl::DrawIntegration()
 {
 	if (!bDRAW_INTEGRATION) { return; }
 	ensure(pWorld);
@@ -415,7 +417,7 @@ void FCrowdPFModule::Impl::DrawIntegration(const TArray<IntegrationField>& Integ
 	}
 }
 
-void FCrowdPFModule::Impl::DrawFlows(const TArray<FlowField>& FlowFields)
+void FCrowdPFModule::Impl::DrawFlows()
 {
 	ensure(pWorld);
 	FVector Ray{ 0.f, 0.f, FLOW_ARROW_HEIGHT };

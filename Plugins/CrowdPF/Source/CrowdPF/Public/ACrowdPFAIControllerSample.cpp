@@ -62,7 +62,8 @@ void ACrowdPFAIControllerSample::FindPathForMoveRequest(const FAIMoveRequest& Mo
             UWorld* pWorld = GetWorld();
             ensure(pWorld);
             CrowdPFModule->Init(pWorld);
-            CrowdPFModule->DoFlowTiles(MoveRequest.GetGoalActor(), OutPath);
+            CrowdPFModule->DoFlowTiles(GetPawn()->GetActorLocation(), MoveRequest.GetGoalActor()->GetActorLocation(), OutPath);
+            //TArray<FVector> Points{ {1940.f,350.f,60.f},
         }
         else
         {

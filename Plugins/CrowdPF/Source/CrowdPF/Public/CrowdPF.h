@@ -29,7 +29,7 @@ public:
 
     /** Public Interface of FCrowdPFModule */
     void Init(UWorld* _World); // TODO refactor into own class (factory)
-    void DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath);
+    void DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath);
 
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;

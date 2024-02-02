@@ -56,7 +56,7 @@ struct IntegrationField {
 
 class FCrowdPFModule::Impl {
 public:
-	void DoFlowTiles(const AActor* GoalActor, FNavPathSharedPtr& OutPath);
+	void DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath);
 	void Init(UWorld* _World);
 private:
 
@@ -78,15 +78,23 @@ private:
 	const float CELL_DIAG = CELL_SIZE * SQRT_OF_2;
 	const float H_CELL_DIAG = CELL_SIZE * SQRT_OF_2;
 
-	void BresenhamsRay2D(const TArray<uint8_t>& CostFields, const FIntVector2& Goal, FIntVector2 Origin, OUT std::deque<FIntVector2>& LOS);
-	void GetLos(const TArray<uint8_t>& CostFields, const FIntVector2& Cell, const FIntVector2& Goal, std::deque<FIntVector2>& Los);
-	void VisitCell(const TArray<uint8_t>& CostFields, std::deque<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT TArray<IntegrationField>& IntegrationFields, OUT std::deque<FIntVector2>& SecondWaveFront, bool bLosPass);
-	void PropagateWave(const TArray<uint8_t>& CostFields, TArray<IntegrationField>& IntegrationFields, std::deque<FIntVector2>& WaveFront, bool bLosPass, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront);
-	void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields);
-	void CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields);
+	bool IsWall(const FIntVector2& Cell) const;
+
+	void BresenhamsRay2D(const FIntVector2& Goal, FIntVector2 Origin, OUT std::deque<FIntVector2>& LOS);
+	void GetLos(const FIntVector2& Cell, const FIntVector2& Goal, std::deque<FIntVector2>& Los);
+	void VisitCell(std::deque<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront, bool bLosPass);
+	void PropagateWave(std::deque<FIntVector2>& WaveFront, bool bLosPass, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront);
+	void ConvertFlowTilesToPath(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath);
+	void CalculateFlowFields();
+	void CalculateCostFields();
+	void SetNeedToRecalculate(const bool bValue);
+	bool GetNeedToRecalculate(const FIntVector2& Goal);
 
 	/* Data */
 	TArray<FlowField> FlowFields;
+	TArray<uint8_t> CostFields;
+	TArray<IntegrationField> IntegrationFields;
+	bool NeedToRecalculate;
 
 	/* Debugging Tools */
 
@@ -94,9 +102,9 @@ private:
 	const float TEXT_HEIGHT = PLANE_HEIGHT + 2.f;
 	const float FLOW_ARROW_HEIGHT = PLANE_HEIGHT + 50.f;
 
-	void DrawCosts(const TArray<uint8_t>& CostFields);
-	void DrawIntegration(const TArray<IntegrationField>& IntegrationFields);
-	void DrawFlows(const TArray<FlowField>& FlowFields);
+	void DrawCosts();
+	void DrawIntegration();
+	void DrawFlows();
 	void DrawLOS(FVector2D NormDir, FVector2D Origin, int Scale);
 	void DrawBox(FIntVector2 At, FColor Color = FColor::Orange);
 	void DrawBox(int At, FColor Color = FColor::Orange);

@@ -93,7 +93,7 @@ private:
 	TArray<FlowField> FlowFields;
 	TArray<uint8_t> CostFields;
 	TArray<IntegrationField> IntegrationFields;
-	bool bNeedToRecalculate = true;
+	bool NeedToRecalculate = true;
 
 	/* Debugging Tools */
 
@@ -102,7 +102,6 @@ private:
 	const float FLOW_ARROW_HEIGHT = PLANE_HEIGHT + 50.f;
 
 	bool bDebugDraw = false; /* Set by Game */
-	const bool bDRAW_COORDS = true;
 	const bool bDRAW_COSTS = true;
 	const bool bDRAW_INTEGRATION = true;
 	const bool bDRAW_FLOWS = true;

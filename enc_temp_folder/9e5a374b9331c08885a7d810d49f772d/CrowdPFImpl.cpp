@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "CrowdPFImpl.h"
 #include "Utils.h"
@@ -207,59 +207,14 @@ void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, boo
 
 void FCrowdPFModule::Impl::ConvertFlowTilesToPath(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath)
 {
-/*
-* What we have:
-namespace Dirs
-{
-	enum EDirection : uint8_t {
-		SouthWest = 0,
-		West,
-		NorthWest,
-		North,
-		NorthEast,
-		East,
-		SouthEast,
-		South
-	};
-	static const std::map<EDirection, FIntVector2> DIRS = { //TODO OPTIMIZE FLAGS
-	{ EDirection::SouthWest,  {-1, -1} },
-	{ EDirection::West,       {-1, 0 } },
-	{ EDirection::NorthWest,  {-1, 1 } },
-	{ EDirection::North,      { 0, 1 } },
-	{ EDirection::NorthEast,  { 1, 1 } },
-	{ EDirection::East,       { 1, 0 } },
-	{ EDirection::SouthEast,  { 1, -1} },
-	{ EDirection::South,      { 0, -1} }
-	};
-}
-	struct FlowField {
-	Dirs::EDirection Dir : 4;
-	uint8_t Completed : 1; // TODO Change this to Pathable in next version
-	uint8_t LOS : 1;
-};
-
-TArray<FlowField> FlowFields; is a member containing Flow tiles
-
-* What we need to output:
-	TArray<FVector> Points{ WorldOrigin
-	 };
-
-	 Points.push_back(WorldGoal);
+	TArray<FVector> Points{ {1940.f,350.f,60.f},
+	{988.f, 551.f, 60.f},
+	{2650.f, 2550.f, 60.f} };
 
 	OutPath = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(Points);
-	OutPath->GetPathPoints()[0].Flags = 81665; // 81665 means 'beginning node'
-	OutPath->GetPathPoints()[0].Flags = 81664; // 81664 means 'intermediate node'
-	OutPath->GetPathPoints()[0].Flags = 81666; // 81666 means 'end node'
-*/
-	FIntVector2 Origin = WorldVectToGridVect(WorldOrigin);
-	int idx = ToLinearIdx(Origin);
-	
-	/*
-	go through FlowFields[idx] and construct world Points
-
-	* Construct world Points using GridVectToWorldVect
-	*/
-
+	OutPath->GetPathPoints()[0].Flags = 81665;
+	OutPath->GetPathPoints()[0].Flags = 81664;
+	OutPath->GetPathPoints()[0].Flags = 81666;
 }
 
 void FCrowdPFModule::Impl::CalculateFlowFields()
@@ -358,12 +313,12 @@ void GetCrowd(UWorld* pWorld, FName Tag, std::queue<int>& Crowd)
 
 bool FCrowdPFModule::Impl::GetNeedToRecalculate(const FIntVector2& Goal)
 {
-	return bNeedToRecalculate;
+	return NeedToRecalculate;
 }
 
 void FCrowdPFModule::Impl::SetNeedToRecalculate(const bool bValue)
 {
-	bNeedToRecalculate = bValue;
+	NeedToRecalculate = bValue;
 }
 
 void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, OUT FNavPathSharedPtr& OutPath)
@@ -377,6 +332,8 @@ void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector
 	{
 		//Cost Fields
 		CalculateCostFields();
+		DrawCoords();
+		DrawBox(Goal);
 
 		// Eikonal
 		std::deque<FIntVector2> WaveFront;
@@ -388,18 +345,13 @@ void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector
 		IntegrationFields[Goal.Y * GRIDSIZE.X + Goal.X].LOS = true;
 		PropagateWave(WaveFront, /*bLosPass =*/ true, Goal, SecondWaveFront);
 		PropagateWave(SecondWaveFront, /*bLosPass =*/ false, Goal, DummyWaveFront); // todo templating
+		DrawIntegration();
 
 		// Flow Fields
 		FlowFields.Init({ Dirs::EDirection(), false, 0 }, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
 		CalculateFlowFields();
-
-		SetNeedToRecalculate(false);
-
-		// Debug
-		DrawCoords();
-		DrawBox(Goal);
-		DrawIntegration();
 		DrawFlows();
+		SetNeedToRecalculate(false);
 	}
 	ConvertFlowTilesToPath(WorldOrigin, WorldGoal, OutPath);
 
@@ -407,7 +359,7 @@ void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector
 
 void FCrowdPFModule::Impl::SetDebugDraw(bool _bDebugDraw)
 {
-	bDebugDraw = _bDebugDraw;
+	bDebugDraw = bDebugDraw;
 }
 
 void FCrowdPFModule::Impl::Init(UWorld* _World)
@@ -464,10 +416,10 @@ void FCrowdPFModule::Impl::DrawIntegration()
 
 			{
 				FVector TextStart = { x * CELL_SIZE + H_CELL_SIZE, y * CELL_SIZE + Q_CELL_SIZE, TEXT_HEIGHT }; // Top corner of cell
-				FString WaveFrontBlocked = IntegrationFields[y * GRIDSIZE.X + x].WaveFrontBlocked ? "|" : "";
+				FString WaveFrontBlocked = IntegrationFields[y * GRIDSIZE.X + x].WaveFrontBlocked ? "+" : "-";
 				auto TextActor = pWorld->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), TextStart, FRotator(90, 0, 180), SpawnParameters);
 				TextActor->GetTextRender()->SetText(FText::FromString(WaveFrontBlocked));
-				TextActor->GetTextRender()->SetTextRenderColor(FColor::Black);
+				TextActor->GetTextRender()->SetTextRenderColor(FColor::Purple);
 			}
 
 			{
@@ -569,10 +521,6 @@ void FCrowdPFModule::Impl::DrawBox(int At, FColor Color)
 
 void FCrowdPFModule::Impl::DrawCoords()
 {
-	if (!bDebugDraw || !bDRAW_COORDS)
-	{
-		return;
-	}
 	ensure(pWorld);
 	DrawDebugCoordinateSystem(pWorld, { 0.f, 0.f, 0.f }, FRotator(0.f), CELL_SIZE, true);
 

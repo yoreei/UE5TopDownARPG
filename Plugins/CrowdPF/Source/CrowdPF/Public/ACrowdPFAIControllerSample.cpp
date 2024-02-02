@@ -28,6 +28,13 @@ void ACrowdPFAIControllerSample::BeginPlay()
     // UE_LOG(LogCrowdPF, Log, TEXT("MoveToActor Result %s"), Result);
 }
 
+void ACrowdPFAIControllerSample::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    Super::EndPlay(EndPlayReason);
+
+    //
+}
+
 FPathFindingResult CustomFindPath(const FNavAgentProperties& AgentProperties, const FPathFindingQuery& Query)
 {
     FPathFindingResult Res = FPathFindingResult();
@@ -62,6 +69,7 @@ void ACrowdPFAIControllerSample::FindPathForMoveRequest(const FAIMoveRequest& Mo
             UWorld* pWorld = GetWorld();
             ensure(pWorld);
             CrowdPFModule->Init(pWorld);
+            CrowdPFModule->SetDebugDraw(DrawCrowdPFDebug);
             CrowdPFModule->DoFlowTiles(GetPawn()->GetActorLocation(), MoveRequest.GetGoalActor()->GetActorLocation(), OutPath);
             //TArray<FVector> Points{ {1940.f,350.f,60.f},
         }

@@ -21,6 +21,7 @@ public:
 protected:
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 	virtual void FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query, FNavPathSharedPtr& OutPath) const override;
@@ -31,9 +32,12 @@ protected:
 	UPROPERTY()
 	class UBehaviorTreeComponent* BehaviorTreeComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = CrowdPf)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Yoreei's Crowd Pathfinder")
 	bool UseCrowdPf;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = CrowdPf)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Yoreei's Crowd Pathfinder")
 	bool DrawDebugPath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Yoreei's Crowd Pathfinder")
+	bool DrawCrowdPFDebug;
 };

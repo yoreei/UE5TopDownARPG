@@ -20,6 +20,7 @@ const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
 class CROWDPF_API FCrowdPFModule : public IModuleInterface
 {
 public:
+    void OnEndPIE(bool bIsSimulating);
     FCrowdPFModule();
     ~FCrowdPFModule();
     FCrowdPFModule(FCrowdPFModule&&);
@@ -29,7 +30,8 @@ public:
 
     /** Public Interface of FCrowdPFModule */
     void Init(UWorld* _World); // TODO refactor into own class (factory)
-    void DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath);
+    void SetDebugDraw(bool _bDebugDraw);
+    void DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, OUT FNavPathSharedPtr& OutPath);
 
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
@@ -37,5 +39,5 @@ public:
 
 private:
     class Impl;
-    TUniquePtr<Impl> ModuleImplementation = TUniquePtr<Impl>();
+    TUniquePtr<Impl> ModuleImplementation = TUniquePtr<Impl>(); // TODO optimize: Use MakeUnique
 };

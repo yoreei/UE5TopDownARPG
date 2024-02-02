@@ -38,7 +38,8 @@ public class CrowdPF : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-                "NavigationSystem"
+                "NavigationSystem",
+                "AIModule"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

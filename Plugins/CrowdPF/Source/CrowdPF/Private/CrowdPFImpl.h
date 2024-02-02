@@ -85,6 +85,9 @@ private:
 	void CalculateFlowFields(TArray<IntegrationField>& IntegrationFields, OUT std::queue<int>& Sources, OUT TArray<FlowField>& FlowFields);
 	void CalculateCostFields(UWorld* World, OUT TArray<uint8_t>& CostFields);
 
+	/* Data */
+	TArray<FlowField> FlowFields;
+
 	/* Debugging Tools */
 
 	const float LOS_FLAG_HEIGHT = PLANE_HEIGHT + 1.f;

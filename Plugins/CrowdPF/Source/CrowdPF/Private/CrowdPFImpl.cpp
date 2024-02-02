@@ -326,13 +326,12 @@ void FCrowdPFModule::Impl::DoFlowTiles(const AActor* GoalActor, FNavPathSharedPt
 	PropagateWave(CostFields, IntegrationFields, SecondWaveFront, /*bLosPass =*/ false, Goal, DummyWaveFront); // todo templating
 	DrawIntegration(IntegrationFields);
 
-	TArray<FlowField> FlowFields;
 	FlowFields.Init({ Dirs::EDirection(), false, 0 }, GRIDSIZE.X * GRIDSIZE.Y); // TODO optimize: can we omit constructing these?
 	std::queue<int> Crowd; // TODO optimize
 	GetCrowd(pWorld, "Crowd", Crowd);
 	check(Crowd.size() > 0);
 
-	CalculateFlowFields(IntegrationFields, Crowd, FlowFields);
+	CalculateFlowFields(IntegrationFields, Crowd, OutPath);
 
 	DrawFlows(FlowFields);
 }

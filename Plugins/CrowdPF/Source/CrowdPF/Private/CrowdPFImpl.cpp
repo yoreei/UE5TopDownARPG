@@ -207,60 +207,64 @@ void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, boo
 
 void FCrowdPFModule::Impl::ConvertFlowTilesToPath(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath)
 {
-/*
-* What we have:
-namespace Dirs
-{
-	enum EDirection : uint8_t {
-		SouthWest = 0,
-		West,
-		NorthWest,
-		North,
-		NorthEast,
-		East,
-		SouthEast,
-		South
-	};
-	static const std::map<EDirection, FIntVector2> DIRS = { //TODO OPTIMIZE FLAGS
-	{ EDirection::SouthWest,  {-1, -1} },
-	{ EDirection::West,       {-1, 0 } },
-	{ EDirection::NorthWest,  {-1, 1 } },
-	{ EDirection::North,      { 0, 1 } },
-	{ EDirection::NorthEast,  { 1, 1 } },
-	{ EDirection::East,       { 1, 0 } },
-	{ EDirection::SouthEast,  { 1, -1} },
-	{ EDirection::South,      { 0, -1} }
-	};
-}
-	struct FlowField {
-	Dirs::EDirection Dir : 4;
-	uint8_t Completed : 1; // TODO Change this to Pathable in next version
-	uint8_t LOS : 1;
-};
-
-TArray<FlowField> FlowFields; is a member containing Flow tiles
-
-* What we need to output:
-	TArray<FVector> Points{ WorldOrigin
-	 };
-
-	 Points.push_back(WorldGoal);
-
-	OutPath = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(Points);
-	OutPath->GetPathPoints()[0].Flags = 81665; // 81665 means 'beginning node'
-	OutPath->GetPathPoints()[0].Flags = 81664; // 81664 means 'intermediate node'
-	OutPath->GetPathPoints()[0].Flags = 81666; // 81666 means 'end node'
-*/
+	// TODO test
+	// Assuming these helper functions exist for coordinate conversion and indexing
 	FIntVector2 Origin = WorldVectToGridVect(WorldOrigin);
-	int idx = ToLinearIdx(Origin);
-	
-	/*
-	go through FlowFields[idx] and construct world Points
+	FIntVector2 Goal = WorldVectToGridVect(WorldGoal);
 
-	* Construct world Points using GridVectToWorldVect
-	*/
+	// Prepare the path points, starting with the origin
+	TArray<FVector> Points;
+	Points.Add(WorldOrigin);
 
+	bool bReachedLOS = false;
+	Dirs::EDirection LastDirection = static_cast<Dirs::EDirection>(-1); // Initialize with an invalid direction
+
+	while (!bReachedLOS) {
+		int idx = ToLinearIdx(Origin);
+
+		// Check if index is out of bounds
+		if (idx < 0 || idx >= FlowFields.Num()) {
+			break;
+		}
+
+		const FlowField& CurrentField = FlowFields[idx];
+		if (CurrentField.LOS) {
+			// If LOS flag is true, break the loop to add the goal directly
+			bReachedLOS = true;
+			break;
+		}
+
+		// If the direction changes, add the current position to the path
+		if (LastDirection != CurrentField.Dir) {
+			FVector CurrentWorldPos = GridVectToWorldVect(Origin);
+			Points.Add(CurrentWorldPos);
+			LastDirection = CurrentField.Dir;
+		}
+
+		// Calculate the next grid position based on the flow direction
+		FIntVector2 DirectionOffset = Dirs::DIRS.at(CurrentField.Dir);
+		FIntVector2 NextGridPos = Origin + DirectionOffset;
+
+		// Update the origin for the next iteration
+		Origin = NextGridPos;
+	}
+
+	// Add the WorldGoal to the path directly if LOS was found or as the final step
+	Points.Add(WorldGoal);
+
+	// Create the navigation path object
+	OutPath = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(Points);
+
+	// Assuming this loop correctly assigns flags based on your specifications
+	if (OutPath->GetPathPoints().Num() > 0) {
+		OutPath->GetPathPoints()[0].Flags = 81665; // Beginning node
+		for (int i = 1; i < OutPath->GetPathPoints().Num() - 1; ++i) {
+			OutPath->GetPathPoints()[i].Flags = 81664; // Intermediate nodes
+		}
+		OutPath->GetPathPoints().Last().Flags = 81666; // End node
+	}
 }
+
 
 void FCrowdPFModule::Impl::CalculateFlowFields()
 {

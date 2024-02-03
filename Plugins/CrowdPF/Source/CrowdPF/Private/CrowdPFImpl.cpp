@@ -307,10 +307,12 @@ void FCrowdPFModule::Impl::CalculateCostFields()
 	{
 		for (int x = 0; x < GridSizeX; ++x)
 		{
-			FVector RayStart = Options.CostTraceYStart + FVector(x * Options.CellSize + Options.CellSize / 2, y * Options.CellSize + Options.CellSize / 2, 0.f);
-			FVector RayEnd = RayStart + Options.CostTraceDirection;
-			FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(ClickableTrace), true);
-			bool bLineTraceObstructed = pWorld->LineTraceSingleByChannel(OutHit, RayStart, RayEnd, ECollisionChannel::ECC_WorldStatic /* , = FCollisionQueryParams::DefaultQueryParam, = FCollisionResponseParams::DefaultResponseParam */);
+			FVector Start = Options.CostTraceYStart + FVector(x * Options.CellSize + Options.CellSize / 2, y * Options.CellSize + Options.CellSize / 2, 0.f);
+			FVector End = Start + Options.CostTraceDirection;
+
+			FCollisionObjectQueryParams ObjectQueryParams(FCollisionObjectQueryParams::AllObjects);
+			ObjectQueryParams.RemoveObjectTypesToQuery(ECollisionChannel::ECC_Pawn);
+			bool bLineTraceObstructed = pWorld->LineTraceSingleByObjectType(OutHit, Start, End, ObjectQueryParams);
 
 			CostFields[y * GridSizeX + x] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}

@@ -68,8 +68,7 @@ void ACrowdPFAIControllerSample::FindPathForMoveRequest(const FAIMoveRequest& Mo
         {
             UWorld* pWorld = GetWorld();
             ensure(pWorld);
-            CrowdPFModule->Init(pWorld);
-            CrowdPFModule->SetDebugDraw(DrawCrowdPFDebug);
+            CrowdPFModule->Init(pWorld, Options);
             CrowdPFModule->DoFlowTiles(GetPawn()->GetActorLocation(), MoveRequest.GetGoalActor()->GetActorLocation(), OutPath);
             //TArray<FVector> Points{ {1940.f,350.f,60.f},
         }
@@ -85,19 +84,6 @@ void ACrowdPFAIControllerSample::FindPathForMoveRequest(const FAIMoveRequest& Mo
         return;
     }
 
-    auto DrawBox = [&](FIntVector2 At, FColor Color) // TODO find better place
-        {
-            UWorld* pWorld = GetWorld();
-            ensure(pWorld);
-            FVector Center{
-                At.X * 100.f + 50.f,
-                At.Y * 100.f + 50.f,
-                60.f
-            };
-            FVector Extent = FVector(50.f, 50.f, 50.f);
-            DrawDebugBox(pWorld, Center, Extent, Color, true);
-            //UE_LOG(LogCrowdPF, Log, TEXT("Draw Box: Center = %s; Extent = %s"), *Center.ToString(), *Extent.ToString());
-        };
     UWorld* pWorld = GetWorld();
     ensure(pWorld);
     const TArray<FNavPathPoint>& PathPoints = OutPath->GetPathPoints();
@@ -105,7 +91,7 @@ void ACrowdPFAIControllerSample::FindPathForMoveRequest(const FAIMoveRequest& Mo
     {
         Chaos::TVector<double, 3> Loc = Point.Location;
         FVector loc2 = Point.Location;
-        DrawDebugBox(pWorld, loc2, {50.f, 50.f, 50.f}, FColor::Black, true, -1.f, 0, 10.f);
-        UE_LOG(LogCrowdPF, Log, TEXT("gotcha drew location %s"), loc2);
+        DrawDebugBox(pWorld, loc2, {20.f, 20.f, 20.f}, FColor::Black, true, -1.f, 0, 5.f);
+        UE_LOG(LogCrowdPF, Log, TEXT("Drawing Path Box at: %s"), *loc2.ToString());
     }
 }

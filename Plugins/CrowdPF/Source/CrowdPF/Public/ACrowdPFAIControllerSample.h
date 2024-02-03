@@ -39,5 +39,5 @@ protected:
 	bool DrawDebugPath;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Yoreei's Crowd Pathfinder")
-	bool DrawCrowdPFDebug;
+	FCrowdPFOptions Options;
 };

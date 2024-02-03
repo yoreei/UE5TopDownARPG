@@ -58,24 +58,12 @@ class FCrowdPFModule::Impl {
 public:
 	void DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, OUT FNavPathSharedPtr& OutPath);
 	void SetDebugDraw(bool _bDebugDraw);
-	void Init(UWorld* _World);
+	void Init(UWorld* _World, FCrowdPFOptions _Options);
 private:
 
-	/* Parameters */
-	const float CELL_SIZE = 100.f;
-	const float PLANE_HEIGHT = 51.f;
-	const FVector COST_TRACE_Y_START = { 0.f, 0.f, 250.f };
-	const FVector COST_TRACE_DIRECTION{ 0.f, 0.f, -100 };
-	const FIntVector2 GRIDSIZE{ 30, 30 };
-	const float SIGNIFICANT_COST_REDUCTION = 0.75f; // 25% reduction
-
-	/* Constants */
 	UWorld* pWorld;
 	const float SQRT_OF_2 = FMath::Sqrt(2.f);
-	const float H_CELL_SIZE = CELL_SIZE / 2;
-	const float Q_CELL_SIZE = CELL_SIZE / 4;
-	const float CELL_DIAG = CELL_SIZE * SQRT_OF_2;
-	const float H_CELL_DIAG = CELL_SIZE * SQRT_OF_2;
+	FCrowdPFOptions Options;
 
 	bool IsWall(const FIntVector2& Cell) const;
 
@@ -95,19 +83,6 @@ private:
 	TArray<IntegrationField> IntegrationFields;
 	bool bNeedToRecalculate = true;
 
-	/* Debugging Tools */
-
-	const float LOS_FLAG_HEIGHT = PLANE_HEIGHT + 1.f;
-	const float TEXT_HEIGHT = PLANE_HEIGHT + 2.f;
-	const float FLOW_ARROW_HEIGHT = PLANE_HEIGHT + 50.f;
-
-	bool bDebugDraw = false; /* Set by Game */
-	const bool bDRAW_COORDS = true;
-	const bool bDRAW_COSTS = true;
-	const bool bDRAW_INTEGRATION = true;
-	const bool bDRAW_FLOWS = true;
-	const bool bDRAW_LOS = true;
-
 	void DrawCosts();
 	void DrawIntegration();
 	void DrawFlows();
@@ -115,4 +90,16 @@ private:
 	void DrawBox(FIntVector2 At, FColor Color = FColor::Orange);
 	void DrawBox(int At, FColor Color = FColor::Orange);
 	void DrawCoords();
+	const int ApplyDir(const int Idx, const FIntVector2& Dir);
+	bool IsInGrid(int X, int Y);
+	bool IsInGrid(const FIntVector2& Cell);
+	bool IsInGrid(int Idx);
+	FIntVector2 ToFIntVector2(int LinearIdx);
+	FIntVector2 WorldVectToGridVect(const FVector& Vect);
+	FVector GridVectToWorldVect(const FIntVector2& Vect);
+	FIntVector2 ToFIntVector2(FVector Vect);
+	int ToLinearIdx(FIntVector2 IntVector2);
+	FVector2D ToVector2D(const FIntVector2& IntVector2);
+	bool IsValidIdx(int Idx);
+	FVector addZ(FVector2D Vect, float Z);
 };

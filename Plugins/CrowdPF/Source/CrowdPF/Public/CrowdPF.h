@@ -11,6 +11,7 @@
 
 
 DECLARE_LOG_CATEGORY_EXTERN(LogCrowdPF, Log, All);
+DECLARE_STATS_GROUP(TEXT("CrowdPF"), STATGROUP_CrowdPF, STATCAT_Advanced);
 
 
 const float SQRT_OF_2 = FMath::Sqrt(2.f);

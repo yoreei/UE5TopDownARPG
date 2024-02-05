@@ -7,9 +7,6 @@
 #include "CrowdPF/Public/CrowdPF.h"
 #include "ACrowdPFAIControllerSample.generated.h"
 
-DECLARE_STATS_GROUP(TEXT("CrowdPF"), STATGROUP_CrowdPF, STATCAT_Advanced);
-DECLARE_CYCLE_STAT(TEXT("DoFlowTiles"), STAT_DoFlowTiles, STATGROUP_CrowdPF);
-DECLARE_DWORD_COUNTER_STAT(TEXT("CrowdPF Pathfinding Invocations"), STAT_DoFlowTiles_DWORD, STATGROUP_CrowdPF);
 /**
  * 
  */

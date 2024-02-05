@@ -190,6 +190,7 @@ void FCrowdPFModule::Impl::VisitCell(std::deque<FIntVector2>& WaveFront, const F
 
 void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, bool bLosPass, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront)
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("STAT_CrowdPF_PropagateWave"), STAT_CrowdPF_PropagateWave, STATGROUP_CrowdPF);
 	SCOPE_LOG_TIME_FUNC();
 	while (!WaveFront.empty()) {
 		FIntVector2 Current = WaveFront.front();
@@ -207,7 +208,7 @@ void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, boo
 
 void FCrowdPFModule::Impl::ConvertFlowTilesToPath(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath)
 {
-	SCOPE_LOG_TIME_FUNC();
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("STAT_CrowdPF_ConvertFlowTilesToPath"), STAT_CrowdPF_ConvertFlowTilesToPath, STATGROUP_CrowdPF);
 	FIntVector2 Origin = WorldVectToGridVect(WorldOrigin);
 	FIntVector2 Goal = WorldVectToGridVect(WorldGoal);
 
@@ -255,7 +256,7 @@ void FCrowdPFModule::Impl::ConvertFlowTilesToPath(const FVector& WorldOrigin, co
 
 void FCrowdPFModule::Impl::CalculateFlowFields()
 {
-	SCOPE_LOG_TIME_FUNC();
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("STAT_CrowdPF_CalculateFlowFields"), STAT_CrowdPF_CalculateFlowFields, STATGROUP_CrowdPF);
 	auto DiagonalReachable = [this](const int CurIdx, const Dirs::EDirection NewDir) {
 		return IntegrationFields[ApplyDir(CurIdx, Next(NewDir))].IntegratedCost != FLT_MAX && IntegrationFields[ApplyDir(CurIdx, Prev(NewDir))].IntegratedCost != FLT_MAX; // TODO change to binary comparison?
 		};
@@ -301,7 +302,7 @@ void FCrowdPFModule::Impl::CalculateFlowFields()
 
 void FCrowdPFModule::Impl::CalculateCostFields()
 {
-	SCOPE_LOG_TIME_FUNC();
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("STAT_CrowdPF_CalculateCostFields"), STAT_CrowdPF_CalculateCostFields, STATGROUP_CrowdPF);
 	CostFields.Init(1, GridSizeX * GridSizeY);
 	FVector HitLocation;
 	FHitResult OutHit;

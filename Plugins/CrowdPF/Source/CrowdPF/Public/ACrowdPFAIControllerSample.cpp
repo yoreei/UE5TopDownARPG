@@ -11,6 +11,8 @@
 
 // FCrowdPFModule* ACrowdPFAIControllerSample::CrowdPFModule = nullptr; // TODO remove
 
+
+
 ACrowdPFAIControllerSample::ACrowdPFAIControllerSample()
 {
 }
@@ -57,9 +59,25 @@ void ACrowdPFAIControllerSample::OnUnPossess()
 
 void ACrowdPFAIControllerSample::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query, FNavPathSharedPtr& OutPath) const
 {
+    /*
+    * Profiling procedure
+    * In console, write:
+    trace.enable counters,cpu,stats
+    stat NamedEvents
+    trace.start
+    <run benchmark>
+    trace.stop
+    */
+    SCOPE_CYCLE_COUNTER(STAT_DoFlowTiles);
+    SCOPED_NAMED_EVENT(DoFlowTilesNamedEvent, FColor::Green);
+    DEC_DWORD_STAT(STAT_DoFlowTiles_DWORD);
+    DECLARE_SCOPE_CYCLE_COUNTER(TEXT("STAT_DoFlowTiles_DECLARE_SCOPE_CYCLE_COUNTER"), STAT_DoFlowTiles_DECLARE_SCOPE_CYCLE_COUNTER, STATGROUP_StatSystem);
+    DECLARE_SCOPE_CYCLE_COUNTER(TEXT("STAT_DoFlowTiles_DECLARE_SCOPE_CYCLE_COUNTER_CrowdPF"), STAT_DoFlowTiles_DECLARE_SCOPE_CYCLE_COUNTER_CrowdPF, STATGROUP_CrowdPF);
+    DECLARE_CYCLE_STAT(TEXT("STAT_DoFlowTiles_DECLARE_CYCLE_STAT"), STAT_DoFlowTiles_DECLARE_CYCLE_STAT, STATGROUP_StatSystem);
+    DECLARE_CYCLE_STAT(TEXT("STAT_DoFlowTiles_DECLARE_CYCLE_STAT_CrowdPF"), STAT_DoFlowTiles_DECLARE_CYCLE_STAT_CrowdPF, STATGROUP_CrowdPF);
     if(!UseCrowdPf)
     {
-            Super::FindPathForMoveRequest(MoveRequest, Query, OutPath);
+        Super::FindPathForMoveRequest(MoveRequest, Query, OutPath);
     }
     else
     {
@@ -70,7 +88,6 @@ void ACrowdPFAIControllerSample::FindPathForMoveRequest(const FAIMoveRequest& Mo
             ensure(pWorld);
             CrowdPFModule->Init(pWorld, Options);
             CrowdPFModule->DoFlowTiles(GetPawn()->GetActorLocation(), MoveRequest.GetGoalActor()->GetActorLocation(), OutPath);
-            //TArray<FVector> Points{ {1940.f,350.f,60.f},
         }
         else
         {

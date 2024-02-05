@@ -145,13 +145,12 @@ void FCrowdPFModule::Impl::GetLos(const FIntVector2& Cell, const FIntVector2& Go
 }
 
 void FCrowdPFModule::Impl::VisitCell(std::deque<FIntVector2>& WaveFront, const FIntVector2& Cell, float CurrentCost, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront, bool bLosPass) {
-	UE_LOG(LogCrowdPF, Log, TEXT("VisitCell Processing [%d, %d]"), Cell.X, Cell.Y);
+	UE_LOG(LogCrowdPF, VeryVerbose, TEXT("VisitCell Processing [%d, %d]"), Cell.X, Cell.Y);
 
 	if (IsInGrid(Cell) == false || IntegrationFields[Cell.Y * GridSizeX + Cell.X].LOS)
 	{
 		return;
 	}
-	//if (Cell.X == 22 && Cell.Y == 25) { __debugbreak(); }
 
 	if (!bLosPass && IsWall(Cell)) // used to be !bLosPass &&
 	{
@@ -183,7 +182,7 @@ void FCrowdPFModule::Impl::VisitCell(std::deque<FIntVector2>& WaveFront, const F
 		{
 			WaveFront.push_back(Cell); // calculate WaveFrontBlocked but don't propagate
 			IntegrationFields[Idx].LOS = bLosPass;
-			UE_LOG(LogCrowdPF, Log, TEXT("VisitCell: Pushing [%d, %d]"), Cell.X, Cell.Y);
+			UE_LOG(LogCrowdPF, VeryVerbose, TEXT("VisitCell: Pushing [%d, %d]"), Cell.X, Cell.Y);
 		}
 
 	}
@@ -191,7 +190,7 @@ void FCrowdPFModule::Impl::VisitCell(std::deque<FIntVector2>& WaveFront, const F
 
 void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, bool bLosPass, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront)
 {
-
+	SCOPE_LOG_TIME_FUNC();
 	while (!WaveFront.empty()) {
 		FIntVector2 Current = WaveFront.front();
 		WaveFront.pop_front();
@@ -208,6 +207,7 @@ void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, boo
 
 void FCrowdPFModule::Impl::ConvertFlowTilesToPath(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath)
 {
+	SCOPE_LOG_TIME_FUNC();
 	FIntVector2 Origin = WorldVectToGridVect(WorldOrigin);
 	FIntVector2 Goal = WorldVectToGridVect(WorldGoal);
 
@@ -255,6 +255,7 @@ void FCrowdPFModule::Impl::ConvertFlowTilesToPath(const FVector& WorldOrigin, co
 
 void FCrowdPFModule::Impl::CalculateFlowFields()
 {
+	SCOPE_LOG_TIME_FUNC();
 	auto DiagonalReachable = [this](const int CurIdx, const Dirs::EDirection NewDir) {
 		return IntegrationFields[ApplyDir(CurIdx, Next(NewDir))].IntegratedCost != FLT_MAX && IntegrationFields[ApplyDir(CurIdx, Prev(NewDir))].IntegratedCost != FLT_MAX; // TODO change to binary comparison?
 		};
@@ -300,6 +301,7 @@ void FCrowdPFModule::Impl::CalculateFlowFields()
 
 void FCrowdPFModule::Impl::CalculateCostFields()
 {
+	SCOPE_LOG_TIME_FUNC();
 	CostFields.Init(1, GridSizeX * GridSizeY);
 	FVector HitLocation;
 	FHitResult OutHit;

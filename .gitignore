@@ -75,3 +75,4 @@ DerivedDataCache/*
 
 # more temp
 enc_temp_folder/*
+debug.log

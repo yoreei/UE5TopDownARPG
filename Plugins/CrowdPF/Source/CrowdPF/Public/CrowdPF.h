@@ -12,6 +12,7 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogCrowdPF, Log, All);
 
+
 const float SQRT_OF_2 = FMath::Sqrt(2.f);
 
 USTRUCT(BlueprintType)

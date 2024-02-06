@@ -191,7 +191,6 @@ void FCrowdPFModule::Impl::VisitCell(std::deque<FIntVector2>& WaveFront, const F
 void FCrowdPFModule::Impl::PropagateWave(std::deque<FIntVector2>& WaveFront, bool bLosPass, const FIntVector2& Goal, OUT std::deque<FIntVector2>& SecondWaveFront)
 {
 	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("STAT_CrowdPF_PropagateWave"), STAT_CrowdPF_PropagateWave, STATGROUP_CrowdPF);
-	SCOPE_LOG_TIME_FUNC();
 	while (!WaveFront.empty()) {
 		FIntVector2 Current = WaveFront.front();
 		WaveFront.pop_front();
@@ -322,6 +321,11 @@ void FCrowdPFModule::Impl::CalculateCostFields()
 	}
 }
 
+void FCrowdPFModule::Impl::UpdateDirtyCostFields()
+{
+	/* TODO Implement */
+}
+
 bool FCrowdPFModule::Impl::GetNeedToRecalculate(const FIntVector2& Goal)
 {
 	return bNeedToRecalculate;
@@ -342,7 +346,7 @@ void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector
 	if (GetNeedToRecalculate(Goal))
 	{
 		//Cost Fields
-		CalculateCostFields();
+		UpdateDirtyCostFields();
 
 		// Eikonal
 		std::deque<FIntVector2> WaveFront;
@@ -378,6 +382,7 @@ void FCrowdPFModule::Impl::Init(UWorld* _World, FCrowdPFOptions _Options)
 {
 	pWorld = _World;
 	Options = _Options;
+	CalculateCostFields();
 }
 
 void FCrowdPFModule::Impl::DrawCosts()

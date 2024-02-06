@@ -45,29 +45,139 @@ bool FLatent_ActivateAbility::Update()
 //	return true;
 //}
 
-IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST(FTBoltAbilityTest, FUE5TopDownARPGAutomationTestBase, "UE5TopDownARPG.BoltAbility",
+IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST(FT1UnitMazeTest, FUE5TopDownARPGAutomationTestBase, "CrowdPF.FT1UnitMaze",
 	EAutomationTestFlags::EditorContext |
 	EAutomationTestFlags::ClientContext |
 	EAutomationTestFlags::ProductFilter)
 
-	bool FTBoltAbilityTest::RunTest(const FString& params)
+	bool FT1UnitMazeTest::RunTest(const FString& params)
 {	
-	AutomationOpenMap(TEXT("/Game/Content/TopDown/Maps/TopDownMap"));
+	AutomationOpenMap(TEXT("/Game/Content/TopDown/Maps/1UnitMaze"));
 
 	UWorld* World = GetAutomationTestWorld();
 
 	if (IsValid(World) == false)
 	{
-		UE_LOG(LogUE5TopDownARPG, Error, TEXT("FTBoltAbilityTest::RunTest() IsValid(World) == false"));
+		UE_LOG(LogUE5TopDownARPG, Error, TEXT("FT1UnitMazeTest::RunTest() IsValid(World) == false"));
 		return false;
 	}
 
 	ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
-	//ADD_LATENT_AUTOMATION_COMMAND(FLatent_ActivateAbility(ActiveCharacter, TargetCharacter));
-	//ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
-	//ADD_LATENT_AUTOMATION_COMMAND(FLatent_CheckBoltAbilityTargetHealth(TargetCharacter, TargetCharacter->GetHealth(), ExpectedHealth));
-	//ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
-	
+	ADD_LATENT_AUTOMATION_COMMAND(FExitGameCommand);
+
+	return true;
+}
+
+IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST(FT50UnitMaze, FUE5TopDownARPGAutomationTestBase, "CrowdPF.FT50UnitMaze",
+	EAutomationTestFlags::EditorContext |
+	EAutomationTestFlags::ClientContext |
+	EAutomationTestFlags::ProductFilter)
+
+	bool FT50UnitMaze::RunTest(const FString& params)
+{
+	AutomationOpenMap(TEXT("/Game/Content/TopDown/Maps/50UnitMaze"));
+
+	UWorld* World = GetAutomationTestWorld();
+
+	if (IsValid(World) == false)
+	{
+		UE_LOG(LogUE5TopDownARPG, Error, TEXT("FT50UnitMaze::RunTest() IsValid(World) == false"));
+		return false;
+	}
+
+	ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
+	ADD_LATENT_AUTOMATION_COMMAND(FExitGameCommand);
+
+	return true;
+}
+
+IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST(FT200UnitMaze, FUE5TopDownARPGAutomationTestBase, "CrowdPF.FT200UnitMaze",
+	EAutomationTestFlags::EditorContext |
+	EAutomationTestFlags::ClientContext |
+	EAutomationTestFlags::ProductFilter)
+
+	bool FT200UnitMaze::RunTest(const FString& params)
+{
+	AutomationOpenMap(TEXT("/Game/Content/TopDown/Maps/200UnitMaze"));
+
+	UWorld* World = GetAutomationTestWorld();
+
+	if (IsValid(World) == false)
+	{
+		UE_LOG(LogUE5TopDownARPG, Error, TEXT("ProfilingAutomation::RunTest() IsValid(World) == false"));
+		return false;
+	}
+
+	ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
+	ADD_LATENT_AUTOMATION_COMMAND(FExitGameCommand);
+
+	return true;
+}
+
+IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST(FT1UnitSimple, FUE5TopDownARPGAutomationTestBase, "CrowdPF.FT1UnitSimple",
+	EAutomationTestFlags::EditorContext |
+	EAutomationTestFlags::ClientContext |
+	EAutomationTestFlags::ProductFilter)
+
+	bool FT1UnitSimple::RunTest(const FString& params)
+{
+	AutomationOpenMap(TEXT("/Game/Content/TopDown/Maps/1UnitSimple"));
+
+	UWorld* World = GetAutomationTestWorld();
+
+	if (IsValid(World) == false)
+	{
+		UE_LOG(LogUE5TopDownARPG, Error, TEXT("FT1UnitSimple::RunTest() IsValid(World) == false"));
+		return false;
+	}
+
+	ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
+	ADD_LATENT_AUTOMATION_COMMAND(FExitGameCommand);
+
+	return true;
+}
+
+IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST(FT50UnitSimple, FUE5TopDownARPGAutomationTestBase, "CrowdPF.FT50UnitSimple",
+	EAutomationTestFlags::EditorContext |
+	EAutomationTestFlags::ClientContext |
+	EAutomationTestFlags::ProductFilter)
+
+	bool FT50UnitSimple::RunTest(const FString& params)
+{
+	AutomationOpenMap(TEXT("/Game/Content/TopDown/Maps/50UnitSimple"));
+
+	UWorld* World = GetAutomationTestWorld();
+
+	if (IsValid(World) == false)
+	{
+		UE_LOG(LogUE5TopDownARPG, Error, TEXT("ProfilingAutomation::RunTest() IsValid(World) == false"));
+		return false;
+	}
+
+	ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
+	ADD_LATENT_AUTOMATION_COMMAND(FExitGameCommand);
+
+	return true;
+}
+
+IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST(FT200UnitSimple, FUE5TopDownARPGAutomationTestBase, "CrowdPF.FT200UnitSimple",
+	EAutomationTestFlags::EditorContext |
+	EAutomationTestFlags::ClientContext |
+	EAutomationTestFlags::ProductFilter)
+
+	bool FT200UnitSimple::RunTest(const FString& params)
+{
+	AutomationOpenMap(TEXT("/Game/Content/TopDown/Maps/200UnitSimple"));
+
+	UWorld* World = GetAutomationTestWorld();
+
+	if (IsValid(World) == false)
+	{
+		UE_LOG(LogUE5TopDownARPG, Error, TEXT("ProfilingAutomation::RunTest() IsValid(World) == false"));
+		return false;
+	}
+
+	ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(3.0f));
 	ADD_LATENT_AUTOMATION_COMMAND(FExitGameCommand);
 
 	return true;

@@ -74,6 +74,7 @@ private:
 	void ConvertFlowTilesToPath(const FVector& WorldOrigin, const FVector& WorldGoal, FNavPathSharedPtr& OutPath);
 	void CalculateFlowFields();
 	void CalculateCostFields();
+	void UpdateDirtyCostFields();
 	void SetNeedToRecalculate(const bool bValue);
 	bool GetNeedToRecalculate(const FIntVector2& Goal);
 

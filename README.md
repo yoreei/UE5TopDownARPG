@@ -29,10 +29,13 @@ For each new goal, we perform 4 main steps:
 		
 **UpdateCostFields** // Check if Cost Fields are dirty & updates them
 
+![PropagateWave](LosPass.png)
 **PropagateWave**(/*bLosPass =*/ true); 
 
+![PropagateWave](PropagateWaveFront.png)
 **PropagateWave**(/*bLosPass =*/ false);
 
+![FlowFields](FlowFields.png)
 **CalculateFlowFields** // The output of our algorithm
 
 ### Adaptors
@@ -45,24 +48,24 @@ Since Unreal Engine's stock PathFollowingComponent does not understand Flow Fiel
 
 
 ## Stretch Goals
-[x] Profile & Benchmark against UE5's single-track pathfinding solution
-[x] Implement Automation Tests
-[x] Visualize cost & direction
-[x] Package as a UE Plugin
+- [x] Profile & Benchmark against UE5's single-track pathfinding solution
+- [x] Implement Automation Tests
+- [x] Visualize cost & direction
+- [x] Package as a UE Plugin
 
 ## Further Work
-[] Paralelize using SIMD | GPU
-[] Utilize **Morton order** for NavMap``
-[] Query Recast's NavMesh instead of using LineTrace for NavMap creation
-[] Dynamically add obstacles / change costs
-[] Combine with Any-angle pathfinding, e.g. Theta*, Anya
+- [ ] Paralelize using SIMD | GPU
+- [ ] Utilize **Morton order** for NavMap``
+- [ ] Query Recast's NavMesh instead of using LineTrace for NavMap creation
+- [ ] Dynamically add obstacles / change costs
+- [ ] Combine with Any-angle pathfinding, e.g. Theta*, Anya
 
 ## Things to Experiment With
 
-[] Hexagons/Octagons instead of squares
-[] Object Pooling for FlowTiles
-[] Automatically Detect Map Sectors.
-[] Greedy Eikonal: Directed Wave Propagation.
+- [ ] Hexagons/Octagons instead of squares
+- [ ] Object Pooling for FlowTiles
+- [ ] Automatically Detect Map Sectors.
+- [ ] Greedy Eikonal: Directed Wave Propagation.
 
 ![Alt text](image-13.png)
 

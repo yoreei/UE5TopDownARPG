@@ -1,18 +1,66 @@
-# UE5TopDownARPG
-Template for a Top Down ARPG created with Unreal Engine 5.
+# Yoreei's Tile-Flow Crowd Pathfinder
 
-Part of the learning materials for the course 'Game Engine Architecture with UE4' taught at the University of Sofia.
 
-See the Game Engine Architecture lectures at
-[https://github.com/nikoladimitroff/Game-Engine-Architecture](https://github.com/nikoladimitroff/Game-Engine-Architecture)
+## Intro
 
-The course is supported by [Ubisoft Sofia](https://ubisoft.com) and [Kipi Interactive](http://www.kipiinteractive.com/).
+![Alt text](image-14.png)
 
-# How to setup the project
+## Core Goals
 
-* Download Git from [here](https://git-scm.com/)   
-* Download Git LFS from [here](https://git-lfs.github.com/)   
-* Open your command-line interpreter and type:    
-git clone https://github.com/k1p1/UE5TopDownARPG.git FOLDERPATH   
-where FOLDERPATH is the path to the folder you want to store the project in (for example C:\Projects\)
-* Mouse right click on TopDownARPG.uproject -> "Generate Visual Studio Project Files"
+Implement Flow Field pathfinding as described in [Emerson, Elijah. "Crowd pathfinding and steering using flow field tiles." Game AI Pro 360: Guide to Movement and Pathfinding. CRC Press, 2019. 67-76.](https://www.gameaipro.com/GameAIPro/GameAIPro_Chapter23_Crowd_Pathfinding_and_Steering_Using_Flow_Field_Tiles.pdf). This pathfinding algorithm should provide better performance for games with hundreds to thousands of units, which are often ordered to travel to a specific location, e.g. armies in RTS games.
+
+## Assumptions
+- 2D Square-tiled map
+
+## Motivation
+Flow field pathfinding should excel at many-units-single-goal scenarios, as well as maze-style maps which require a lot of turns. These are worst-case scenarios for the stock navmesh pathfinding in Unreal Engine 5, which prefers open fields and lower number of units per pathfinding request. Our objective is not to beat A* at its game, but to provide a solution to the above worst-case scenarios.
+
+## Implementation
+
+### Setup
+
+**CalculateCostFields**
+
+### Pathfinding
+
+For each new goal, we perform 4 main steps:
+		
+**UpdateCostFields** // Check if Cost Fields are dirty & updates them
+
+**PropagateWave**(/*bLosPass =*/ true); 
+
+**PropagateWave**(/*bLosPass =*/ false);
+
+**CalculateFlowFields** // The output of our algorithm
+
+### Adaptors
+
+Since Unreal Engine's stock PathFollowingComponent does not understand Flow Fields, we need to translate the flow fields to a Path (an array of points):
+
+**ConvertFlowTilesToPath**
+
+## Evaluation
+
+
+## Stretch Goals
+[x] Profile & Benchmark against UE5's single-track pathfinding solution
+[x] Implement Automation Tests
+[x] Visualize cost & direction
+[x] Package as a UE Plugin
+
+## Further Work
+[] Paralelize using SIMD | GPU
+[] Utilize **Morton order** for NavMap``
+[] Query Recast's NavMesh instead of using LineTrace for NavMap creation
+[] Dynamically add obstacles / change costs
+[] Combine with Any-angle pathfinding, e.g. Theta*, Anya
+
+## Things to Experiment With
+
+[] Hexagons/Octagons instead of squares
+[] Object Pooling for FlowTiles
+[] Automatically Detect Map Sectors.
+[] Greedy Eikonal: Directed Wave Propagation.
+
+![Alt text](image-13.png)
+

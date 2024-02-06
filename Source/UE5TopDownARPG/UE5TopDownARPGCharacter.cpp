@@ -11,11 +11,9 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Materials/Material.h"
 #include "Engine/World.h"
-#include "Abilities/BaseAbility.h"
 #include "UE5TopDownARPGGameMode.h"
 #include "UE5TopDownARPGPlayerController.h"
 #include "UE5TopDownARPG.h"
-#include "UI/HealthbarWidget.h"
 #include "Net/UnrealNetwork.h"
 
 AUE5TopDownARPGCharacter::AUE5TopDownARPGCharacter()
@@ -60,32 +58,6 @@ AUE5TopDownARPGCharacter::AUE5TopDownARPGCharacter()
 	OnTakeAnyDamage.AddDynamic(this, &AUE5TopDownARPGCharacter::TakeAnyDamage);
 }
 
-void AUE5TopDownARPGCharacter::PostInitializeComponents()
-{
-	Super::PostInitializeComponents();
-
-	if (IsValid(WidgetComponent->GetWidgetClass()))
-	{
-		WidgetComponent->InitWidget();
-		HealthbarWidget = Cast<UHealthbarWidget>(WidgetComponent->GetUserWidgetObject());
-	}
-}
-
-void AUE5TopDownARPGCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-	
-	if (AbilityTemplate != nullptr)
-	{
-		AbilityInstance = NewObject<UBaseAbility>(this, AbilityTemplate);
-	}
-	if (IsValid(HealthbarWidget))
-	{
-		float HealthPercent = Health / MaxHealth;
-		HealthbarWidget->SetPercent(HealthPercent);
-	}
-}
-
 void AUE5TopDownARPGCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -112,33 +84,8 @@ void AUE5TopDownARPGCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	DOREPLIFETIME(AUE5TopDownARPGCharacter, MaxHealth);
 }
 
-bool AUE5TopDownARPGCharacter::ActivateAbility(FVector Location)
-{
-	if (IsValid(AbilityInstance))
-	{
-		return AbilityInstance->Activate(Location);
-	}
-	return false;
-}
-
 void AUE5TopDownARPGCharacter::TakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, AController* InstigateBy, AActor* DamageCauser)
 {
-	Health -= Damage;
-	OnRep_SetHealth(Health + Damage);
-	UE_LOG(LogUE5TopDownARPG, Log, TEXT("Health %f"), Health);
-	if (IsValid(HealthbarWidget))
-	{
-		float HealthPercent = Health / MaxHealth;
-		HealthbarWidget->SetPercent(HealthPercent);
-	}
-	if (Health <= 0.0f)
-	{
-		FTimerManager& TimerManager = GetWorld()->GetTimerManager();
-		if (TimerManager.IsTimerActive(DeathHandle) == false)
-		{
-			GetWorld()->GetTimerManager().SetTimer(DeathHandle, this, &AUE5TopDownARPGCharacter::Death, DeathDelay);
-		}
-	}
 }
 
 void AUE5TopDownARPGCharacter::OnRep_SetHealth(float OldHealth)
@@ -172,7 +119,7 @@ void AUE5TopDownARPGCharacter::Death()
 	AUE5TopDownARPGPlayerController* PlayerController = Cast<AUE5TopDownARPGPlayerController>(GetController());
 	if (IsValid(PlayerController))
 	{
-		PlayerController->OnPlayerDied();
+		//PlayerController->OnPlayerDied();
 	}
 	Destroy();
 }

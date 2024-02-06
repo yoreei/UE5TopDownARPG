@@ -320,7 +320,6 @@ void FCrowdPFModule::Impl::CalculateCostFields()
 			CostFields[y * GridSizeX + x] = bLineTraceObstructed ? UINT8_MAX : 1;
 		}
 	}
-	DrawCosts();
 }
 
 bool FCrowdPFModule::Impl::GetNeedToRecalculate(const FIntVector2& Goal)
@@ -335,7 +334,7 @@ void FCrowdPFModule::Impl::SetNeedToRecalculate(const bool bValue)
 
 void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector& WorldGoal, OUT FNavPathSharedPtr& OutPath)
 {
-	ensure(pWorld);
+	if (!ensure(pWorld)){ return; }
 
 	FIntVector2 Goal = WorldVectToGridVect(WorldGoal);
 	FIntVector2 Origin = WorldVectToGridVect(WorldOrigin);
@@ -366,6 +365,7 @@ void FCrowdPFModule::Impl::DoFlowTiles(const FVector& WorldOrigin, const FVector
 		if (Options.bDebugDraw)
 		{
 			DrawCoords();
+			DrawCosts();
 			DrawIntegration();
 			DrawFlows();
 		}
@@ -382,7 +382,7 @@ void FCrowdPFModule::Impl::Init(UWorld* _World, FCrowdPFOptions _Options)
 
 void FCrowdPFModule::Impl::DrawCosts()
 {
-	if (!Options.bDebugDraw || !Options.bDrawCosts)
+	if (!Options.bDrawCosts)
 	{
 		return;
 	}
@@ -394,7 +394,7 @@ void FCrowdPFModule::Impl::DrawCosts()
 			FVector RayStart = Options.CostTraceYStart + FVector(x * Options.CellSize + Options.CellSize / 2, y * Options.CellSize + Options.CellSize / 2, 0.f);
 			FVector RayEnd = RayStart + Options.CostTraceDirection;
 			// UE_LOG(LogCrowdPF, Log, TEXT("CostFields [%d][%d] = [%d]"),i, j, CostFields[i * GridSizeX + j]);
-			DrawDebugDirectionalArrow(pWorld, RayStart, RayEnd, 3.0f, CostFields[y * GridSizeX + x] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 2.f);
+			DrawDebugDirectionalArrow(pWorld, RayStart, RayEnd, 3.0f, CostFields[y * GridSizeX + x] == UINT8_MAX ? FColor::Red : FColor::Green, true, -1.f, 0, 15.f);
 		}
 	}
 }
@@ -493,25 +493,6 @@ void FCrowdPFModule::Impl::DrawFlows()
 			}
 		}
 	}
-}
-
-/*
-Origin in World Coordinates
-*/
-void FCrowdPFModule::Impl::DrawLOS(FVector2D NormDir, FVector2D Origin = { 0.f,0.f }, int Scale = 1000000)
-{
-	if (!Options.bDebugDraw || !Options.bDrawLos)
-	{
-		return;
-	}
-
-	FVector2D Direction = NormDir * Scale;
-	FVector2D End = Direction + Origin;
-
-	FVector Origin3D = addZ(Origin, 60.f);
-	FVector End3D = addZ(End, 60.f);
-	DrawDebugDirectionalArrow(pWorld, Origin3D, End3D, 3.f, FColor::Emerald, true, 9999999.f, 0, 2.f);
-
 }
 
 void FCrowdPFModule::Impl::DrawBox(FIntVector2 At, FColor Color)

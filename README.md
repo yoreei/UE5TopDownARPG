@@ -19,6 +19,8 @@ Flow field pathfinding should excel at many-units-single-goal scenarios, as well
 
 ### Setup
 
+![CostFields](CostFields.png)
+
 **CalculateCostFields**
 
 ### Pathfinding

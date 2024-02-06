@@ -3,6 +3,7 @@
 #include "UE5TopDownARPGGameMode.h"
 #include "UE5TopDownARPGPlayerController.h"
 #include "UE5TopDownARPGCharacter.h"
+#include "CrowdPF/Public/CrowdPF.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UE5TopDownARPG.h"
 #include "NavigationSystem.h"
@@ -25,6 +26,19 @@ AUE5TopDownARPGGameMode::AUE5TopDownARPGGameMode()
 	{
 		PlayerControllerClass = PlayerControllerBPClass.Class;
 	}
+}
+
+void AUE5TopDownARPGGameMode::StartPlay()
+{
+	FCrowdPFModule* CrowdPFModule = FModuleManager::LoadModulePtr<FCrowdPFModule>("CrowdPF");
+	if (CrowdPFModule)
+	{
+		UWorld* pWorld = GetWorld();
+		ensure(pWorld);
+		CrowdPFModule->Init(pWorld, Options);
+	}
+
+	Super::StartPlay();
 }
 
 void AUE5TopDownARPGGameMode::EndGame(bool IsWin)

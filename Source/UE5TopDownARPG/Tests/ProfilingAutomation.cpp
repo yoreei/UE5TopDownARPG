@@ -1,4 +1,4 @@
-#include "BoltAbilityTest.h"
+#include "ProfilingAutomation.h"
 #include "UE5TopDownARPGAutomationTestBase.h"
 #include "../UE5TopDownARPG.h"
 #include "../UE5TopDownARPGCharacter.h"
@@ -7,23 +7,23 @@
 
 bool FLatent_ActivateAbility::Update()
 {
-	if (IsValid(ActiveCharacter) == false)
-	{
-		UE_LOG(LogUE5TopDownARPG, Error, TEXT("FLatent_ActivateAbility::Update IsValid(ActiveCharacter) == false"));
-		return false;
-	}
+	//if (IsValid(ActiveCharacter) == false)
+	//{
+	//	UE_LOG(LogUE5TopDownARPG, Error, TEXT("FLatent_ActivateAbility::Update IsValid(ActiveCharacter) == false"));
+	//	return false;
+	//}
 
-	if (IsValid(TargetCharacter) == false)
-	{
-		UE_LOG(LogUE5TopDownARPG, Error, TEXT("FLatent_ActivateAbility::Update IsValid(TargetCharacter) == false"));
-		return false;
-	}
+	//if (IsValid(TargetCharacter) == false)
+	//{
+	//	UE_LOG(LogUE5TopDownARPG, Error, TEXT("FLatent_ActivateAbility::Update IsValid(TargetCharacter) == false"));
+	//	return false;
+	//}
 
-	if (ActiveCharacter->ActivateAbility(TargetCharacter->GetActorLocation()) == false)
-	{
-		UE_LOG(LogUE5TopDownARPG, Error, TEXT("FLatent_ActivateAbility::Update ActiveCharacter->ActivateAbility(TargetCharacter->GetActorLocation()) == false"));
-		return false;
-	}
+	//if (ActiveCharacter->ActivateAbility(TargetCharacter->GetActorLocation()) == false)
+	//{
+	//	UE_LOG(LogUE5TopDownARPG, Error, TEXT("FLatent_ActivateAbility::Update ActiveCharacter->ActivateAbility(TargetCharacter->GetActorLocation()) == false"));
+	//	return false;
+	//}
 
 	return true;
 }

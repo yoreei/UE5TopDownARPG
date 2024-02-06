@@ -50,9 +50,6 @@ struct CROWDPF_API FCrowdPFOptions {
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Yoreei's Crowd Pathfinder")
     bool bDrawFlows = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Yoreei's Crowd Pathfinder")
-    bool bDrawLos = true;
-
     float LosFlagHeight() { return PlaneHeight + 1.f; };
     float TextHeight() { return PlaneHeight + 2.f; };
     float FlowArrowHeight() { return PlaneHeight + 50.f; };

@@ -10,7 +10,6 @@
 // #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "UE5TopDownARPGCharacter.h"
-#include "UE5TopDownARPGHUD.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -30,15 +29,6 @@ AUE5TopDownARPGPlayerController::AUE5TopDownARPGPlayerController()
 	FollowTime = 0.f;
 }
 
-void AUE5TopDownARPGPlayerController::OnPlayerDied()
-{
-	AUE5TopDownARPGHUD* HUD = Cast<AUE5TopDownARPGHUD>(GetHUD());
-	if (IsValid(HUD))
-	{
-		HUD->ShowEndGameScreen();
-	}
-}
-
 void AUE5TopDownARPGPlayerController::BeginPlay()
 {
 	// Call the base class  
@@ -49,17 +39,6 @@ void AUE5TopDownARPGPlayerController::BeginPlay()
 	{
 		Subsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
-
-	UWorld* World = GetWorld();
-	ensure(World);
-
-	// this is how you init a module
-	//FCrowdPFModule* CrowdPFModule = FModuleManager::LoadModulePtr<FCrowdPFModule>("CrowdPF");
-	//if (CrowdPFModule)
-	//{
-	//	CrowdPFModule->Init(World);
-	//	CrowdPFModule->DoFlowTiles();
-	//}
 }
 
 void AUE5TopDownARPGPlayerController::SetupInputComponent()
@@ -169,9 +148,9 @@ void AUE5TopDownARPGPlayerController::OnActivateAbilityStarted()
 		}
 
 		// If we hit a surface, cache the location
-		if (bHitSuccessful)
-		{
-			ARPGCharacter->ActivateAbility(Hit.Location);
-		}
+		//if (bHitSuccessful)
+		//{
+		//	ARPGCharacter->ActivateAbility(Hit.Location);
+		//}
 	}
 }
